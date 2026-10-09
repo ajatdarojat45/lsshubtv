@@ -1,6 +1,5 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation } from '@tanstack/react-query';
 import { getMatches, getMatchDetail, getStreamUrl, getAllLiveMatches } from '@/app/actions';
-import type { MatchSource } from '@/lib/types';
 
 /** Never auto-retry a rate-limit (HTTP 429): re-hitting immediately makes the
  * upstream limiter angrier and starves the UI. Other errors get one retry. */
@@ -36,40 +35,50 @@ const ALL_LIVE_POLL = {
   refetchOnReconnect: false,
 } as const;
 
+/** Bounded retry. A 429 gets a short self-healing window (2 retries) so a
+ * category switch rides out a transient limiter window instead of failing and
+ * forcing a manual Refresh; a regular error gets at most one retry. The
+ * previous `!isRateLimited(error) || failureCount < 1` was wrong for non-429
+ * errors (it returned `true` forever → infinite retry → the list stayed blank).
+ * getAllLiveMatches is resilient (skips failed sports, returns ok with partial
+ * data) so the fan-out never throws and never retries the whole 16-sport burst;
+ * only cheap single-sport/detail requests retry, so this can't re-amplify. */
 const retryPolicy = (failureCount: number, error: unknown): boolean =>
-  !isRateLimited(error) && failureCount < 1;
+  isRateLimited(error) ? failureCount < 2 : failureCount < 1;
 
-/** Exponential backoff, capped, so a transient 429 cools down instead of hammering. */
-const retryDelay = (attemptIndex: number): number => Math.min(1000 * 2 ** attemptIndex, 15_000);
+/** Exponential backoff, capped. A 429 needs real wall-clock time to clear, so
+ * start it at 2s; other errors at 1s. Cap at 10s so a transient failure never
+ * strands the UI for too long. */
+const retryDelay = (attemptIndex: number, error: unknown): number =>
+  Math.min((isRateLimited(error) ? 2000 : 1000) * 2 ** attemptIndex, 10_000);
 
-/** Match list, cached by (source, sportType). */
-export function useMatches(sportType: number, source: MatchSource = 'data', enabled = true) {
+/** Match list for the currently-selected category, as a SINGLE always-enabled
+ * query whose key mirrors the active sport. sportType 0 = "All/Live" (fans out
+ * to every sport), any other value = that one sport.
+ *
+ * Why one query instead of gating two with `enabled`: in React Query v5 a
+ * query that mounts while `enabled: false` does not adopt/run a newly-changed
+ * queryKey until it is refetched manually. The old
+ * `useMatches(..., !isLive)` + `useAllLiveMatches(isLive)` pair therefore left
+ * the freshly-selected category stuck in `pending` with no fetch — data only
+ * appeared after clicking Refresh. A single always-enabled query fetches on
+ * every key change immediately, and `placeholderData: keepPreviousData` keeps
+ * the previous category visible (no blank flash) while the new one loads. */
+export function useSportMatches(sportType: number) {
+  const isAllLive = sportType === 0;
   return useQuery({
-    queryKey: ['matches', source, sportType],
+    queryKey: isAllLive ? ['live-matches'] : ['matches', 'data', sportType],
     queryFn: async () => {
-      const res = await getMatches({ source, sportType, language: 0 });
+      const res = isAllLive
+        ? await getAllLiveMatches()
+        : await getMatches({ source: 'data', sportType, language: 0 });
       if (!res.ok) throw new Error(res.error);
       return res.data;
     },
-    enabled,
+    placeholderData: keepPreviousData,
     retry: retryPolicy,
     retryDelay,
-    ...SINGLE_POLL,
-  });
-}
-/** All live matches across every sport category. */
-export function useAllLiveMatches(enabled: boolean) {
-  return useQuery({
-    queryKey: ['live-matches'],
-    queryFn: async () => {
-      const res = await getAllLiveMatches();
-      if (!res.ok) throw new Error(res.error);
-      return res.data;
-    },
-    enabled,
-    retry: retryPolicy,
-    retryDelay,
-    ...ALL_LIVE_POLL,
+    ...(isAllLive ? ALL_LIVE_POLL : SINGLE_POLL),
   });
 }
 

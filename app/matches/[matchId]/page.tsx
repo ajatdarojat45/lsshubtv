@@ -6,17 +6,17 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import { useRB } from '@/components/RBProvider';
 import { MatchDetail, TeamLogo, StatusBadge } from '@/components/Match';
 import { formatMatchDate } from '@/lib/matchProto';
-import { useMatches, useMatchDetail, useStreamUrl } from '@/lib/queries';
-import type { Stream } from '@/lib/types';
+import { useSportMatches, useMatchDetail, useStreamUrl } from '@/lib/queries';
+import type { Match, Stream } from '@/lib/types';
 
 export default function MatchDetailPage() {
   const params = useParams<{ matchId: string }>();
   const matchId = params.matchId;
   const { cfg } = useRB();
 
-  const matchesQuery = useMatches(cfg.sportType);
-  const listMatch = matchesQuery.data?.list.find((m) => String(m.matchId) === String(matchId));
-  const sportType = listMatch?.sportType ?? cfg.sportType;
+  const matchesQuery = useSportMatches(Number(cfg.sportType));
+  const listMatch = matchesQuery.data?.list.find((m: Match) => String(m.matchId) === String(matchId));
+  const sportType = listMatch?.sportType ?? Number(cfg.sportType);
 
   const detailQuery = useMatchDetail(matchId, sportType);
   const streamMutation = useStreamUrl();

@@ -17,57 +17,76 @@ export interface ProtobufResponse {
 }
 
 /* ---------- Global outbound throttle ----------
- * Every control-plane upstream request funnels through fetchRaw. A single
- * spacing limiter guarantees a minimum gap between consecutive calls so a
- * fan-out (e.g. getAllLiveMatches across 16 sports, or React StrictMode's
- * double invoke) can never burst the upstream rate limiter. Streaming media
- * does NOT go through here, so video playback is unaffected. Module state
- * persists per Node server instance, so this is a process-global limiter —
- * the same assumption the existing sigCache/inflight maps already rely on. */
-let throttleChain: Promise<void> = Promise.resolve();
+ * Every control-plane upstream request funnels through fetchRaw. This
+ * scheduler bounds upstream load two ways so the rate limiter never trips:
+ *   1. a minimum gap between request STARTS (≈3.3 req/s) — the limiter trips
+ *      at ~6.6 req/s, so this keeps steady-state comfortably under it;
+ *   2. a small concurrency cap (3) so a burst (getAllLiveMatches across 16
+ *      sports, React StrictMode double-invoke, multiple tabs) can never open
+ *      more than 3 upstream connections at once.
+ * Crucially, the concurrency slot is held until the request SETTLES (not
+ * released on start), so the concurrency cap is a true cap; and the 429 backoff
+ * lives OUTSIDE this scheduler (see fetchRaw note + queries.ts retryDelay), so a
+ * rate-limited retry never occupies a scheduler slot while it sleeps. That last
+ * point is what fixes "clicking a category shows nothing until I hit Refresh":
+ * the previous fully-serial throttle held every queued request behind the
+ * 16-sport Live fan-out (5-13s), so a category switch appeared to do nothing.
+ * Streaming media does NOT go through here, so video playback is unaffected.
+ * Module state persists per Node server instance — the same assumption the
+ * existing sigCache/inflight maps already rely on. */
+let activeCount = 0;
 let lastReqAt = 0;
-const MIN_REQ_GAP_MS = 150;
+const MIN_REQ_GAP_MS = 300;
+const MAX_CONCURRENT = 3;
 
 function scheduleUpstream<T>(fn: () => Promise<T>): Promise<T> {
-  const run = throttleChain.then(async () => {
-    const wait = MIN_REQ_GAP_MS - (Date.now() - lastReqAt);
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastReqAt = Date.now();
-    return fn();
+  return new Promise<T>((resolve, reject) => {
+    const launch = () => {
+      // Re-check the cap at launch time: several requests can have their start
+      // gap elapse together, and we must not overshoot MAX_CONCURRENT.
+      if (activeCount >= MAX_CONCURRENT) {
+        setTimeout(tryStart, 50);
+        return;
+      }
+      activeCount += 1;
+      lastReqAt = Date.now();
+      // Release the slot the moment the request starts (not when it resolves),
+      // so a slow upstream response never stalls the rest of the queue.
+      fn().then(resolve, reject).finally(() => {
+        activeCount -= 1;
+      });
+    };
+    const tryStart = () => {
+      if (activeCount >= MAX_CONCURRENT) {
+        setTimeout(tryStart, 50);
+        return;
+      }
+      const wait = MIN_REQ_GAP_MS - (Date.now() - lastReqAt);
+      if (wait > 0) setTimeout(launch, wait);
+      else launch();
+    };
+    tryStart();
   });
-  // Keep the chain progressing even if a request rejects.
-  throttleChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
 }
 
-/** Fetch one upstream API endpoint, spaced by the global throttle, with a
- * bounded + Retry-After-aware backoff on HTTP 429 so a transient rate limit
- * self-heals instead of surfacing to the UI. The backoff sleeps inside the
- * scheduled slot, which also applies backpressure to every queued request. */
+/** Fetch one upstream API endpoint, spaced by the global throttle.
+ *
+ * Do NOT retry HTTP 429 here. React Query is the SINGLE retry layer and runs
+ * its backoff client-side, OUTSIDE this scheduler — so a retry never holds a
+ * throttle slot. Retrying here as well multiplied every rate-limited call into
+ * up to 12 upstream requests (this loop × React Query's retry), which tripped
+ * the limiter far harder and made a category switch appear to do nothing until
+ * a manual Refresh. Letting React Query own the retry de-amplifies the storm
+ * and lets a transient limit self-heal without surfacing to the UI. */
 async function fetchRaw(url: string, options?: RequestInit): Promise<RawResponse> {
   return scheduleUpstream(async () => {
-    const doFetch = () =>
-      fetch(url, {
-        ...options,
-        headers: { ...RB_HEADERS, ...((options?.headers as Record<string, string>) ?? {}) },
-      });
-    for (let attempt = 0; ; attempt++) {
-      const res = await doFetch();
-      if (res.status === 429 && attempt < 2) {
-        await res.arrayBuffer().catch(() => undefined); // drain before retry
-        // Honor Retry-After (seconds) when present; else exponential backoff.
-        const ra = Number(res.headers.get('retry-after'));
-        const base = Number.isFinite(ra) && ra > 0 ? ra * 1000 : 600 * 2 ** attempt;
-        await new Promise((r) => setTimeout(r, Math.min(base, 8000)));
-        continue;
-      }
-      const body = await res.arrayBuffer();
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      return { status: res.status, bytes: new Uint8Array(body), headers: res.headers };
-    }
+    const res = await fetch(url, {
+      ...options,
+      headers: { ...RB_HEADERS, ...((options?.headers as Record<string, string>) ?? {}) },
+    });
+    const body = await res.arrayBuffer();
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    return { status: res.status, bytes: new Uint8Array(body), headers: res.headers };
   });
 }
 

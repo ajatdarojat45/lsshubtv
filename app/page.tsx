@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Radio, MoreHorizontal, RefreshCw, Loader2, Inbox, Clock, CircleCheck, type LucideIcon } from 'lucide-react';
 import { useRB } from '@/components/RBProvider';
 import { MatchRow, MatchRowSkeleton } from '@/components/Match';
 import { isLiveStatus, matchDateMs } from '@/lib/matchProto';
-import { useMatches, useAllLiveMatches } from '@/lib/queries';
+import { useSportMatches } from '@/lib/queries';
 import { POPULAR_SPORTS, MORE_SPORTS, SPORTS, sportLabel, sportIcon } from '@/lib/sports';
 import type { Match, Sport } from '@/lib/types';
 
@@ -66,13 +66,26 @@ function MatchListContent() {
 
   const isLiveSport = Number(cfg.sportType) === 0;
 
-  const regularMatchesQuery = useMatches(cfg.sportType, 'data', !isLiveSport);
-  const liveMatchesQuery = useAllLiveMatches(isLiveSport);
-  const matchesQuery = isLiveSport ? liveMatchesQuery : regularMatchesQuery;
+  // ONE query whose key reflects the active category. gating with `enabled`
+  // (the old two-query approach) makes React Query v5 defer the new queryFn
+  // on key change until a manual refetch — which is why clicking a category
+  // showed nothing until Refresh. A single always-enabled query refetches on
+  // key change immediately; keepPreviousData avoids the blank flash between.
+  const matchesQuery = useSportMatches(Number(cfg.sportType));
 
-  const matches = matchesQuery.data ?? null;
+  // Keep the last non-empty list so a rate-limited (429) category switch never
+  // blanks the UI. On error, React Query drops the keepPreviousData placeholder,
+  // which would otherwise render an empty list until a manual Refresh. Falling
+  // back to the last good list keeps the view stable while the retry above
+  // self-heals; the new category's data appears the moment it succeeds.
+  const lastGood = useRef<Match[]>([]);
+  const fetchedList = matchesQuery.data?.list;
+  if (fetchedList?.length) lastGood.current = fetchedList;
+  const matches =
+    matchesQuery.data ??
+    (lastGood.current.length ? { list: lastGood.current, source: 'data' as const } : null);
   const busy = matchesQuery.isLoading;
-  const err = matchesQuery.isError
+  const err = matchesQuery.isError && !matches
     ? matchesQuery.error instanceof Error
       ? matchesQuery.error.message
       : String(matchesQuery.error)

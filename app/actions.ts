@@ -127,15 +127,27 @@ export async function getAllLiveMatches(
   { concurrency = 4 }: { concurrency?: number } = {}
 ): Promise<Result<{ list: Match[]; source: MatchSource }>> {
   try {
-    const perSport = await mapLimit(SPORTS, concurrency, async (sport) => {
-      const s = await ensureSignatures(sport.value);
-      const args = { version: s[100], language: 0, sportType: sport.value };
-      // Reuse the shared cache; failures reject and are skipped below.
-      return withCache(`matches:data:${sport.value}:0`, 20_000, async () => {
-        const r = await getMatchLive(args);
-        const data = r.pb?.data ?? r.payload;
-        return decodeMatchLiveResp(data, 0);
-      });
+    const perSport = await mapLimit(SPORTS, concurrency, async (sport): Promise<Match[]> => {
+      // Each sport is INDEPENDENT and NON-FATAL. A failure here (HTTP 429, a
+      // signature 429, a decode throw) resolves to [] so that ONE rate-limited
+      // category can neither reject the whole 16-sport batch nor trigger React
+      // Query to retry the entire fan-out. That retry amplification (16 → 32 →
+      // 64 …) is what saturated the upstream limiter, which in turn made a
+      // single-category click queue behind the storm and 429 as well — the
+      // "nothing until I hit Refresh" symptom. Skipping the sport instead makes
+      // the fan-out return ok:true with partial data, so it never retries.
+      try {
+        const s = await ensureSignatures(sport.value);
+        const args = { version: s[100], language: 0, sportType: sport.value };
+        // Reuse the shared cache; failures resolve to [] via the catch below.
+        return await withCache(`matches:data:${sport.value}:0`, 20_000, async () => {
+          const r = await getMatchLive(args);
+          const data = r.pb?.data ?? r.payload;
+          return decodeMatchLiveResp(data, 0);
+        });
+      } catch {
+        return [];
+      }
     });
 
     const list = perSport.flat().filter((m) => isLiveStatus(m.status));
