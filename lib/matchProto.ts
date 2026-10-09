@@ -27,6 +27,7 @@
 //   PBTeam:    2=name, 3=logo, 4=score
 
 import { iterFields } from './proto';
+import { countryLogoUrl, teamLogoUrl } from './logos';
 import type { Team, League, Contender, Match, Stream, MatchDetail } from './types';
 
 const dec = new TextDecoder('utf-8', { fatal: false });
@@ -86,7 +87,41 @@ export function pickLocalName(map: Record<number, string> | string | undefined, 
   return map[lang] ?? map[0] ?? Object.values(map)[0] ?? '';
 }
 
+/** Expand raw `logo` filenames into full URLs (mirrors LogoConstant).
+ * Team logos use the sport-specific path; the league badge uses the
+ * country-logo path with the league's nested `countryLogo` value. */
+export function resolveMatchLogos(m: Match): Match {
+  if (m.home?.logo) m.home.logo = teamLogoUrl(m.sportType, m.home.logo);
+  if (m.away?.logo) m.away.logo = teamLogoUrl(m.sportType, m.away.logo);
+  // Doubles (tenis/bulutangkis ganda): expand every player/team logo.
+  for (const t of m.homeTeams ?? []) if (t.logo) t.logo = teamLogoUrl(m.sportType, t.logo);
+  for (const t of m.awayTeams ?? []) if (t.logo) t.logo = teamLogoUrl(m.sportType, t.logo);
+  for (const c of m.contenders ?? []) {
+    if (c.team?.logo) c.team.logo = teamLogoUrl(m.sportType, c.team.logo);
+  }
+  if (m.league) {
+    // HomeViewModel.setMatchLogo(getCountryLogo(league.country.logo)) —
+    // the row badge is the *country* logo, not PBDataLeague.logo.
+    const badge = m.league.countryLogo || m.league.logo;
+    if (badge) m.league.logo = countryLogoUrl(badge);
+  }
+  return m;
+}
+
 /* ---------- data.proto (DataAPI) ---------- */
+/** PBDataCountry (field 80): 1=countryId, 3=name map, 4=logo. */
+function decodeDataCountry(buf: Uint8Array, lang: number): { name: string; logo: string } {
+  let logo = '';
+  const nameMap: Record<number, string> = {};
+  for (const f of iterFields(buf)) {
+    if (f.field === 3 && f.wire === 2) {
+      const e = decodeNameEntry(f.value as Uint8Array);
+      if (e) nameMap[e[0]] = e[1];
+    } else if (f.field === 4 && f.wire === 2) logo = str(f.value);
+  }
+  return { name: pickLocalName(nameMap, lang), logo };
+}
+
 function decodeDataTeam(buf: Uint8Array, lang: number): Team {
   const t: Team = {};
   for (const f of iterFields(buf)) {
@@ -95,11 +130,57 @@ function decodeDataTeam(buf: Uint8Array, lang: number): Team {
       const e = decodeNameEntry(f.value as Uint8Array);
       if (e) (t.nameMap ??= {})[e[0]] = e[1];
     } else if (f.field === 4 && f.wire === 2) t.logo = str(f.value);
-    else if (f.field === 80 && f.wire === 2) t.country = str(f.value);
-    else if (f.field === 90) t.hot = !!f.value;
+    else if (f.field === 80 && f.wire === 2) {
+      // PBDataCountry is a nested message (not a plain string).
+      const c = decodeDataCountry(f.value as Uint8Array, lang);
+      if (c.name) t.country = c.name;
+      if (c.logo) t.countryLogo = c.logo;
+    } else if (f.field === 90) t.hot = !!f.value;
   }
   t.name = pickLocalName(t.nameMap, lang);
   return t;
+}
+
+/** PBDataPlayer: 1=playerId, 3=name map, 4=avatar, 80=country, 90=hot. */
+function decodeDataPlayer(buf: Uint8Array, lang: number): Team {
+  const t: Team = {};
+  for (const f of iterFields(buf)) {
+    if (f.field === 1) t.playerId = f.value as number;
+    else if (f.field === 3 && f.wire === 2) {
+      const e = decodeNameEntry(f.value as Uint8Array);
+      if (e) (t.nameMap ??= {})[e[0]] = e[1];
+    } else if (f.field === 4 && f.wire === 2) t.logo = str(f.value);
+    else if (f.field === 80 && f.wire === 2) {
+      const c = decodeDataCountry(f.value as Uint8Array, lang);
+      if (c.name) t.country = c.name;
+      if (c.logo) t.countryLogo = c.logo;
+    } else if (f.field === 90) t.hot = !!f.value;
+  }
+  t.name = pickLocalName(t.nameMap, lang);
+  return t;
+}
+
+/** PBDataContender: 1=sportType, 2=name(slug), 10=team, 20=player.
+ * Tennis/badminton singles carry the player in field 20; team sports use
+ * field 10. Returns null for title-only entries (field 2 alone). */
+function decodeDataContender(buf: Uint8Array, lang: number): Contender | null {
+  const c: Contender = {};
+  let slug = '';
+  for (const f of iterFields(buf)) {
+    if (f.field === 1) c.sportType = f.value as number;
+    else if (f.field === 2 && f.wire === 2) slug = str(f.value);
+    else if (f.field === 10 && f.wire === 2) c.team = decodeDataTeam(f.value as Uint8Array, lang);
+    else if (f.field === 20 && f.wire === 2) c.team = decodeDataPlayer(f.value as Uint8Array, lang);
+  }
+  if (!c.team) {
+    // Title-only entry ("A vs B") — caller keeps the slug for m.title.
+    return slug ? { name: slug } : null;
+  }
+  // Player entries in tennis/badminton have no name map on some payloads —
+  // fall back to the entry slug so the row never shows "?".
+  if (!c.team.name && slug) c.team.name = slug;
+  if (!c.name) c.name = slug || c.team.name;
+  return c;
 }
 
 function decodeDataLeague(buf: Uint8Array, lang: number): League {
@@ -110,8 +191,12 @@ function decodeDataLeague(buf: Uint8Array, lang: number): League {
       const e = decodeNameEntry(f.value as Uint8Array);
       if (e) (l.nameMap ??= {})[e[0]] = e[1];
     } else if (f.field === 4) l.logo = str(f.value);
-    else if (f.field === 80) l.country = str(f.value);
-    else if (f.field === 90) l.hot = !!f.value;
+    else if (f.field === 80 && f.wire === 2) {
+      // PBDataCountry is a nested message (not a plain string).
+      const c = decodeDataCountry(f.value as Uint8Array, lang);
+      if (c.name) l.country = c.name;
+      if (c.logo) l.countryLogo = c.logo;
+    } else if (f.field === 90) l.hot = !!f.value;
   }
   l.name = pickLocalName(l.nameMap, lang);
   return l;
@@ -119,8 +204,10 @@ function decodeDataLeague(buf: Uint8Array, lang: number): League {
 
 export function decodeDataMatch(buf: Uint8Array, lang: number): Match {
   const m: Match = { source: 'data' };
-  const contenderTeams: Team[] = [];
-  let contenderSlug = '';
+  // field 30 is `repeated PBDataContender` — each top-level occurrence is ONE
+  // contender. Index 0 is the title-only entry ("A vs B"); the rest carry a
+  // team (field 10) or a player (field 20).
+  const rawContenders: Contender[] = [];
   for (const f of iterFields(buf)) {
     switch (f.field) {
       case 1: m.matchId = f.value as number; break;
@@ -151,28 +238,13 @@ export function decodeDataMatch(buf: Uint8Array, lang: number): Match {
       case 22: m.homeScore = f.value as number; break;
       case 23: m.awayScore = f.value as number; break;
       case 30: {
-        // Contender sports (football, tenis, ...): field 30 REPEATED, satu
-        // entry per kompetitor. Entry judul hanya berisi field 2 (slug "A vs
-        // B"); entry kompetitor membawa tim PBDataTeam di field 10
-        // (football), 20 atau 21 (tenis). Urutan entry = home dulu, away
-        // kemudian — dipakai sebagai penentu sisi utama, dengan nomor field
-        // team sebagai penentu tambahan (20=home, 21=away).
-        for (const cf of iterFields(f.value as Uint8Array)) {
-          if (cf.wire !== 2) continue;
-          if (cf.field === 10 || cf.field === 20 || cf.field === 21) {
-            const team = decodeDataTeam(cf.value as Uint8Array, lang);
-            const idx = contenderTeams.length;
-            contenderTeams.push(team);
-            if (cf.field === 20 && !m.home) m.home = team;
-            else if (cf.field === 21 && !m.away) m.away = team;
-            else if (idx === 0 && !m.home && !m.away) m.home = team;
-            else if (idx === 1 && !m.away) m.away = team;
-            else if (!m.home) m.home = team;
-            else if (!m.away) m.away = team;
-          } else if (cf.field === 2 && !contenderSlug) {
-            contenderSlug = str(cf.value);
-          }
-        }
+        // field 30 is `repeated PBDataContender` — every top-level occurrence
+        // is one contender (do NOT re-iterate inside; the value IS the
+        // PBDataContender). decodeDataContender returns null for title-only
+        // entries (field 2 alone, "A vs B"); those are collected too so the
+        // pairing below can skip raw index 0 exactly like the app.
+        const c = decodeDataContender(f.value as Uint8Array, lang);
+        if (c) rawContenders.push(c);
         break;
       }
       case 40: m.group = str(f.value); break;
@@ -181,10 +253,28 @@ export function decodeDataMatch(buf: Uint8Array, lang: number): Match {
       default: break;
     }
   }
-  // Contender sports (tenis): entry slug pertama ("A vs B") menjadi judul
-  // bila field 19 tidak ada; home/away sudah diisi inline pada case 30.
-  if (!m.name && contenderSlug) m.title = contenderSlug;
-  if (contenderTeams.length) m.contenders = contenderTeams.map((team) => ({ team }));
+  // field 30 pairing mirrors HomeContenderState.convertContender + ta/d.java:
+  // raw index 0 is the title-only entry ("A vs B"); the app starts at index 1
+  // and pairs the rest — even indices = home, odd = away. For doubles this
+  // gives home = [0]+[2], away = [1]+[3]; for singles home = [0], away = [1].
+  const [head, ...tail] = rawContenders;
+  // Title fallback from the head entry when field 19 (name) is absent.
+  if (!m.name && head && !head.team && head.name) m.title = head.name;
+  // Skip the head entry only when it is genuinely title-only (no team/player);
+  // if it carries a competitor, keep the full list to avoid dropping data.
+  const competitors = head && !head.team ? tail : rawContenders;
+  if (competitors.length) {
+    m.contenders = competitors;
+    const homeTeams = competitors.filter((_, i) => i % 2 === 0).map((c) => c.team).filter((t): t is Team => !!t);
+    const awayTeams = competitors.filter((_, i) => i % 2 === 1).map((c) => c.team).filter((t): t is Team => !!t);
+    if (homeTeams.length) m.homeTeams = homeTeams;
+    if (awayTeams.length) m.awayTeams = awayTeams;
+    // Field 20/21 (team sports) wins when present; contender sports rely on
+    // the first player/team of each side so the row never shows "?".
+    if (!m.home && homeTeams[0]) m.home = homeTeams[0];
+    if (!m.away && awayTeams[0]) m.away = awayTeams[0];
+  }
+  resolveMatchLogos(m);
   return m;
 }
 export function decodeMatchLiveResp(payload: Uint8Array, lang: number): Match[] {
@@ -312,6 +402,7 @@ function decodeLiveMatch(buf: Uint8Array): Match {
   }
   if (m.home && m.home.score !== undefined) m.homeScore = m.home.score;
   if (m.away && m.away.score !== undefined) m.awayScore = m.away.score;
+  resolveMatchLogos(m);
   return m;
 }
 

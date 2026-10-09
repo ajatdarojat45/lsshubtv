@@ -3,27 +3,43 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { Flame, Tv, Loader2, Dot } from 'lucide-react';
 import { statusLabel, isLiveStatus, isStarted, formatMatchDate, matchDateMs, isPlayable } from '@/lib/matchProto';
+import { countryLogoUrl, teamLogoUrl } from '@/lib/logos';
 import { sportColor, sportIcon, sportLabel, sportIsScoring } from '@/lib/sports';
-import type { Match, MatchDetail, Stream } from '@/lib/types';
+import type { Match, MatchDetail, Stream, Team } from '@/lib/types';
 import StreamPlayer from './StreamPlayer';
 
-export function TeamLogo({ path, name }: { path?: string; name?: string }) {
+export function TeamLogo({ path, name, sportType, kind = 'team' }: { path?: string; name?: string; sportType?: number; kind?: 'team' | 'league' }) {
   const [broken, setBroken] = useState(false);
-  if (!path || broken) {
+  // Server actions already expand raw filenames, but cached payloads may
+  // still carry a bare filename — resolve client-side as a safety net.
+  const src = kind === 'league' ? countryLogoUrl(path) : teamLogoUrl(sportType, path);
+  useEffect(() => { setBroken(false); }, [src]);
+  if (!src || broken) {
     const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
     return <span className="logo logo-empty" aria-hidden="true">{initial}</span>;
   }
-  let p = path;
-  if (p.startsWith('http')) {
-    try {
-      const u = new URL(p);
-      p = u.pathname + u.search;
-    } catch {
-      p = path;
-    }
-  }
-  const src = `/logo-api${p.startsWith('/') ? '' : '/'}${p}`;
-  return <img className="logo" src={src} alt="" loading="lazy" onError={() => setBroken(true)} />;
+  // Logo hostnames change/expire often and may not resolve from the server
+  // network — load straight from upstream in the browser. onError falls back
+  // to the initial-letter placeholder, never a broken image.
+  return <img className="logo" src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+}
+
+/** One side of a versus matchup. Singles render one logo+name; doubles
+ * (tennis/badminton ganda) stack every player/team with their logo, matching
+ * the app's "name[0] / name[2]" vs "name[1] / name[3]" pairing. */
+function TeamSide({ teams, sportType }: { teams?: Team[]; sportType?: number }) {
+  const list = teams?.length ? teams : [];
+  if (!list.length) return <span className="row-team-name">{'?'}</span>;
+  return (
+    <span className="row-team-side">
+      {list.map((t, i) => (
+        <span className="row-team-member" key={t.teamId ?? t.playerId ?? i}>
+          <TeamLogo path={t.logo} name={t.name} sportType={sportType} />
+          <span className="row-team-name">{t.name || '?'}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export function StatusBadge({ status }: { status?: number }) {
@@ -112,20 +128,18 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
       </span>
 
       <span className="row-league">
-        <TeamLogo path={match.league?.logo} name={league} />
+        <TeamLogo path={match.league?.logo} name={league} kind="league" />
         <span className="row-league-name">{league}</span>
       </span>
 
       {scoring ? (
         <span className="row-teams">
           <span className="row-team">
-            <TeamLogo path={match.home?.logo} name={match.home?.name} />
-            <span>{match.home?.name || '?'}</span>
+            <TeamSide teams={match.homeTeams?.length ? match.homeTeams : match.home ? [match.home] : []} sportType={match.sportType} />
           </span>
           <span className="row-score">{score(match.homeScore)} : {score(match.awayScore)}</span>
           <span className="row-team away">
-            <span>{match.away?.name || '?'}</span>
-            <TeamLogo path={match.away?.logo} name={match.away?.name} />
+            <TeamSide teams={match.awayTeams?.length ? match.awayTeams : match.away ? [match.away] : []} sportType={match.sportType} />
           </span>
         </span>
       ) : (
@@ -258,7 +272,7 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
   return (
     <div className="match-detail">
       <div className="detail-head">
-        <TeamLogo path={m.league?.logo} name={league} />
+        <TeamLogo path={m.league?.logo} name={league} kind="league" />
         <div className="detail-head-text">
           <strong>{league}</strong>
           <div className="muted">
@@ -273,8 +287,7 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
       {versus && (
         <div className="detail-score">
           <div className="detail-team">
-            <TeamLogo path={m.home?.logo} name={m.home?.name} />
-            <span>{m.home?.name || '?'}</span>
+            <TeamSide teams={m.homeTeams?.length ? m.homeTeams : m.home ? [m.home] : []} sportType={m.sportType ?? sportType} />
           </div>
           {started ? (
             <div className="detail-score-num">
@@ -287,8 +300,7 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
             </div>
           )}
           <div className="detail-team">
-            <TeamLogo path={m.away?.logo} name={m.away?.name} />
-            <span>{m.away?.name || '?'}</span>
+            <TeamSide teams={m.awayTeams?.length ? m.awayTeams : m.away ? [m.away] : []} sportType={m.sportType ?? sportType} />
           </div>
         </div>
       )}

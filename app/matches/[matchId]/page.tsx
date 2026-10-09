@@ -67,7 +67,7 @@ export default function MatchDetailPage() {
       {meta && !detail && (
         <section className="panel">
           <div className="detail-head">
-            <TeamLogo path={meta.league?.logo} name={meta.league?.name} />
+            <TeamLogo path={meta.league?.logo} name={meta.league?.name} kind="league" />
             <div className="detail-head-text">
               <strong>{meta.league?.name || meta.title || meta.name || '-'}</strong>
               <div className="muted">{formatMatchDate(meta.matchDate)}</div>

@@ -6,10 +6,12 @@ export type MatchSource = 'data' | 'live';
 
 export interface Team {
   teamId?: number;
+  playerId?: number;
   name?: string;
   nameMap?: Record<number, string>;
   logo?: string;
   country?: string;
+  countryLogo?: string;
   hot?: boolean;
   score?: number;
 }
@@ -20,6 +22,7 @@ export interface League {
   nameMap?: Record<number, string>;
   logo?: string;
   country?: string;
+  countryLogo?: string;
   hot?: boolean;
 }
 
@@ -47,6 +50,11 @@ export interface Match {
   hot?: boolean;
   home?: Team;
   away?: Team;
+  /** Doubles/multiple players per side (tennis/badminton ganda, ...).
+   * Even-indexed contenders = home side, odd-indexed = away side,
+   * mirroring HomeContenderState pairing (0+2 vs 1+3). */
+  homeTeams?: Team[];
+  awayTeams?: Team[];
   homeScore?: number;
   awayScore?: number;
   contenders?: Contender[];

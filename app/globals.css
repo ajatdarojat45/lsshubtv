@@ -626,6 +626,27 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .row-team > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .row-team.away { justify-content: flex-end; }
 
+/* One side of the matchup; doubles stack multiple players/teams joined by "/". */
+.row-team-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.row-team-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.row-team-member + .row-team-member::before {
+  content: "/";
+  margin-right: 6px;
+  font-weight: 700;
+  opacity: 0.6;
+}
+.row-team-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+
 .row-score {
   font-size: 16px;
   font-weight: 800;
