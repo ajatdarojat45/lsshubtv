@@ -16,14 +16,59 @@ export interface ProtobufResponse {
   rawSize: number;
 }
 
-async function fetchRaw(url: string, options?: RequestInit): Promise<RawResponse> {
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...RB_HEADERS, ...((options?.headers as Record<string, string>) ?? {}) },
+/* ---------- Global outbound throttle ----------
+ * Every control-plane upstream request funnels through fetchRaw. A single
+ * spacing limiter guarantees a minimum gap between consecutive calls so a
+ * fan-out (e.g. getAllLiveMatches across 16 sports, or React StrictMode's
+ * double invoke) can never burst the upstream rate limiter. Streaming media
+ * does NOT go through here, so video playback is unaffected. Module state
+ * persists per Node server instance, so this is a process-global limiter —
+ * the same assumption the existing sigCache/inflight maps already rely on. */
+let throttleChain: Promise<void> = Promise.resolve();
+let lastReqAt = 0;
+const MIN_REQ_GAP_MS = 150;
+
+function scheduleUpstream<T>(fn: () => Promise<T>): Promise<T> {
+  const run = throttleChain.then(async () => {
+    const wait = MIN_REQ_GAP_MS - (Date.now() - lastReqAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastReqAt = Date.now();
+    return fn();
   });
-  const body = await res.arrayBuffer();
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-  return { status: res.status, bytes: new Uint8Array(body), headers: res.headers };
+  // Keep the chain progressing even if a request rejects.
+  throttleChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+/** Fetch one upstream API endpoint, spaced by the global throttle, with a
+ * bounded + Retry-After-aware backoff on HTTP 429 so a transient rate limit
+ * self-heals instead of surfacing to the UI. The backoff sleeps inside the
+ * scheduled slot, which also applies backpressure to every queued request. */
+async function fetchRaw(url: string, options?: RequestInit): Promise<RawResponse> {
+  return scheduleUpstream(async () => {
+    const doFetch = () =>
+      fetch(url, {
+        ...options,
+        headers: { ...RB_HEADERS, ...((options?.headers as Record<string, string>) ?? {}) },
+      });
+    for (let attempt = 0; ; attempt++) {
+      const res = await doFetch();
+      if (res.status === 429 && attempt < 2) {
+        await res.arrayBuffer().catch(() => undefined); // drain before retry
+        // Honor Retry-After (seconds) when present; else exponential backoff.
+        const ra = Number(res.headers.get('retry-after'));
+        const base = Number.isFinite(ra) && ra > 0 ? ra * 1000 : 600 * 2 ** attempt;
+        await new Promise((r) => setTimeout(r, Math.min(base, 8000)));
+        continue;
+      }
+      const body = await res.arrayBuffer();
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return { status: res.status, bytes: new Uint8Array(body), headers: res.headers };
+    }
+  });
 }
 
 /** GET then parse as PBResponse + extract the payload. */

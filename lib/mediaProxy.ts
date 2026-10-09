@@ -23,23 +23,35 @@ export interface MediaConfig {
 
 // Media config (CSL salt + rbHeaders) fetched from /api/common/params, cached 5 min.
 let mediaCfg: MediaConfig = { at: 0, salt: '00', rbHeaders: null };
+// Coalesce concurrent callers so a cache expiry triggers exactly ONE upstream
+// fetch instead of a thundering herd (every pending image/stream request
+// re-fetching /api/common/params at once → HTTP 429).
+let mediaCfgInflight: Promise<MediaConfig> | null = null;
 
-export async function getMediaConfig(): Promise<MediaConfig> {
-  if (Date.now() - mediaCfg.at < 5 * 60_000) return mediaCfg;
-  try {
-    const r = await fetch(`${DATA_API}/api/common/params`, { headers: RB_HEADERS });
-    const cfg = JSON.parse(rot47(await r.text()));
-    const csl = JSON.parse(cfg['common:cdnSmartLink:app'] || cfg['common:cdnSmartLink'] || '{}');
-    const p3 = JSON.parse(cfg['common:p2p:v3'] || '{}');
-    mediaCfg = {
-      at: Date.now(),
-      salt: csl?.auth?.salt || '00',
-      rbHeaders: p3?.basicConfig?.rbHeaders || null,
-    };
-  } catch (e) {
-    mediaCfg.at = Date.now();
-  }
-  return mediaCfg;
+export function getMediaConfig(): Promise<MediaConfig> {
+  if (Date.now() - mediaCfg.at < 5 * 60_000) return Promise.resolve(mediaCfg);
+  if (mediaCfgInflight) return mediaCfgInflight;
+  mediaCfgInflight = (async () => {
+    try {
+      const r = await fetch(`${DATA_API}/api/common/params`, { headers: RB_HEADERS });
+      const cfg = JSON.parse(rot47(await r.text()));
+      const csl = JSON.parse(cfg['common:cdnSmartLink:app'] || cfg['common:cdnSmartLink'] || '{}');
+      const p3 = JSON.parse(cfg['common:p2p:v3'] || '{}');
+      mediaCfg = {
+        at: Date.now(),
+        salt: csl?.auth?.salt || '00',
+        rbHeaders: p3?.basicConfig?.rbHeaders || null,
+      };
+    } catch (e) {
+      // Keep the last good config but reset the timestamp so the next caller
+      // retries after the window — never cache a failed fetch as success.
+      mediaCfg.at = Date.now();
+    } finally {
+      mediaCfgInflight = null;
+    }
+    return mediaCfg;
+  })();
+  return mediaCfgInflight;
 }
 
 /** Rewrite CSL segment URLs (containing _ctump/_ctuph) to the fallback host. */
