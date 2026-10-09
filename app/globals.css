@@ -170,11 +170,18 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
   gap: 24px;
-  text-align: left;
   padding-bottom: 18px;
 }
+
+/* Presisi kiri / tengah / kanan: kolom tengah (auto) tepat di pusat,
+ * kolom kiri & kanan (1fr) mengisi sisa ruang yang sama. */
+.footer-col { min-width: 0; }
+.footer-col:nth-child(1) { text-align: left; }
+.footer-col:nth-child(2) { text-align: center; }
+.footer-col:nth-child(3) { text-align: right; }
 
 .footer-title {
   margin: 0 0 10px;
@@ -1036,9 +1043,10 @@ pre.error {
 
 /* ---------- responsive ---------- */
 
-/* Laptop / large desktop */
+/* Laptop / large desktop — konten dibatasi 60% dari lebar layar, sisanya jadi
+ * margin kiri-kanan yang lega (≈20% tiap sisi). */
 @media (min-width: 1025px) {
-  .app { max-width: 1120px; }
+  .app { max-width: 60%; }
   .player,
   .player-placeholder { max-height: 560px; }
 }
@@ -1120,6 +1128,9 @@ pre.error {
   .sport-grid { padding: 12px 14px; }
   .empty-state { padding: 32px 16px; }
   .footer-grid { grid-template-columns: 1fr; gap: 18px; padding-bottom: 14px; }
+  .footer-col:nth-child(1),
+  .footer-col:nth-child(2),
+  .footer-col:nth-child(3) { text-align: left; }
 }
 
 /* ---------- dark mode overrides ---------- */
