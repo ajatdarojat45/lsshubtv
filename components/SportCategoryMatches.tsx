@@ -3,9 +3,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Radio, Clock, CircleCheck, Loader2, RefreshCw, Inbox, ChevronDown, type LucideIcon } from 'lucide-react';
+import { Radio, Clock, CircleCheck, Loader2, RefreshCw, ChevronDown, type LucideIcon } from 'lucide-react';
 import { useRB } from '@/components/RBProvider';
 import { MatchRowSkeleton } from '@/components/Match';
+import { EmptyMatches, type EmptyKind } from '@/components/EmptyMatches';
 import { groupMatchesByLeague, LeagueGroupSection } from '@/components/LeagueGroup';
 import { isLiveStatus, matchDateMs } from '@/lib/matchProto';
 import { useSportMatches } from '@/lib/queries';
@@ -188,14 +189,15 @@ export function SportCategoryMatches({ sportType, category, label }: SportCatego
   );
 
   const tabLabel = FILTER_TABS.find((t) => t.key === tab)?.label ?? 'All';
+  const emptyKind: EmptyKind = query ? 'search' : list.length === 0 ? 'none' : 'filter';
   const emptyTitle =
     list.length === 0 ? 'No matches' : query ? 'No results' : `No ${tabLabel.toLowerCase()} matches`;
   const emptyDesc =
     list.length === 0
       ? 'The server may be rejecting the request — try another source or reload.'
       : query
-        ? 'Try a different keyword.'
-        : 'There are no matches in this category right now.';
+        ? `No matches for "${query.trim()}". Try a different keyword or clear the search.`
+        : `There are no ${tabLabel.toLowerCase()} ${label.toLowerCase()} matches right now. Try another tab.`;
 
   return (
     <>
@@ -263,11 +265,14 @@ export function SportCategoryMatches({ sportType, category, label }: SportCatego
       )}
 
       {!busy && matches && visible.length === 0 && (
-        <section className="mb-4 rounded border border-border bg-panel px-5 py-10 text-center max-[640px]:px-4 max-[640px]:py-8">
-          <Inbox className="h-9 w-9" />
-          <h2 className="mt-2 mb-1.5 text-[19px]">{emptyTitle}</h2>
-          <p className="mb-3.5 text-sm leading-[1.65] text-muted">{emptyDesc}</p>
-        </section>
+        <EmptyMatches
+          kind={emptyKind}
+          title={emptyTitle}
+          desc={emptyDesc}
+          onClear={query ? () => setQuery('') : undefined}
+          onRetry={list.length === 0 ? () => void matchesQuery.refetch() : undefined}
+          retryBusy={matchesQuery.isFetching}
+        />
       )}
 
       {groups.map((g, idx) => (

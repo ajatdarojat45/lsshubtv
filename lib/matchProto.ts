@@ -656,7 +656,10 @@ export function matchDateMs(matchDate?: number): number | null {
 export function formatMatchDate(matchDate?: number): string {
   const ms = matchDateMs(matchDate);
   if (!ms) return '-';
+  // Fixed timeZone (UTC) so SSR and client render identical output — a
+  // locale/timezone-dependent format would cause a hydration mismatch.
   return new Date(ms).toLocaleString('en-US', {
+    timeZone: 'UTC',
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
   });
 }

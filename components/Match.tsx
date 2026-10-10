@@ -162,14 +162,21 @@ export function StatusBadge({ status, className }: { status?: number; className?
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
-/** Live countdown to a kickoff timestamp (ms since epoch), ticking every second. */
+/** Live countdown to a kickoff timestamp (ms since epoch), ticking every second.
+ *  Renders a stable placeholder during SSR/hydration — `Date.now()` differs
+ *  between server and client, which would cause a hydration mismatch. */
 export function Countdown({ targetMs }: { targetMs: number }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    setNow(Date.now());
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  if (now === null) {
+    return <div className={COUNTDOWN} role="timer" suppressHydrationWarning>--:--:--</div>;
+  }
 
   const diff = targetMs - now;
   if (diff <= 0) {
