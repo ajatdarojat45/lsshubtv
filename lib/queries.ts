@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery, useMutation } from '@tanstack/react-query';
-import { getMatches, getMatchDetail, getMatchAnalysis, getMatchLineup, getMatchEvent, getStreamUrl, getAllLiveMatches } from '@/app/actions';
+import { getMatches, getMatchDetail, getMatchAnalysis, getMatchLineup, getMatchEvent, getMatchStatistic, getStreamUrl, getAllLiveMatches } from '@/app/actions';
 
 /** Never auto-retry a rate-limit (HTTP 429): re-hitting immediately makes the
  * upstream limiter angrier and starves the UI. Other errors get one retry. */
@@ -148,6 +148,23 @@ export function useMatchEvent(matchId: string | number, sportType?: number) {
     queryKey: ['match-event', matchId, sportType],
     queryFn: async () => {
       const res = await getMatchEvent({ matchId, sportType, language: 0 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: Boolean(matchId) && Number(sportType) > 0,
+    retry: retryPolicy,
+    retryDelay,
+    ...DETAIL_POLL,
+  });
+}
+
+/** Match statistics (possession, shots, cards, …) for a detail page. No
+ *  background polling (see useMatchAnalysis). */
+export function useMatchStatistic(matchId: string | number, sportType?: number) {
+  return useQuery({
+    queryKey: ['match-statistic', matchId, sportType],
+    queryFn: async () => {
+      const res = await getMatchStatistic({ matchId, sportType, language: 0 });
       if (!res.ok) throw new Error(res.error);
       return res.data;
     },

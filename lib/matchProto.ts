@@ -28,7 +28,7 @@
 
 import { iterFields } from './proto';
 import { countryLogoUrl, teamLogoUrl } from './logos';
-import type { Team, League, Contender, Match, Stream, MatchDetail, MatchAnalysis, H2HSummary, LineupPlayer, MatchLineup, MatchEvent, MatchEvents } from './types';
+import type { Team, League, Contender, Match, Stream, MatchDetail, MatchAnalysis, H2HSummary, LineupPlayer, MatchLineup, MatchEvent, MatchEvents, MatchStat, MatchStats } from './types';
 
 const dec = new TextDecoder('utf-8', { fatal: false });
 /** Decode a length-delimited field. Never throws on varint input (returns ''). */
@@ -462,6 +462,69 @@ export function decodeMatchEventResp(payload: Uint8Array, lang: number): MatchEv
   const out: MatchEvent[] = [];
   for (const f of iterFields(payload)) {
     if (f.field === 1 && f.wire === 2) out.push(decodeDataMatchEvent(f.value as Uint8Array, lang));
+  }
+  return out;
+}
+
+/* ---------- statistic (PBMatchStatisticResp, code 104) ---------- */
+
+/** PBMatchStatType → readable label (100–120, plus 154/155 shot summaries). */
+export const statTypeLabel = (code?: number): string =>
+  ({
+    100: 'Ball Possession',
+    101: 'Attacks',
+    102: 'Dangerous Attacks',
+    103: 'Total Shots',
+    104: 'Shots On Target',
+    105: 'Shots Off Target',
+    106: 'Blocked Shots',
+    107: 'Corner Kicks',
+    108: 'Offsides',
+    109: 'Yellow Cards',
+    110: 'Red Cards',
+    111: 'Goalkeeper Saves',
+    112: 'Total Passes',
+    113: 'Accurate Passes',
+    114: 'Long Balls',
+    115: 'Crosses',
+    116: 'Dribbles',
+    117: 'Duels Won',
+    118: 'Tackles',
+    119: 'Interceptions',
+    120: 'Clearances',
+    154: 'Shots On Target',
+    155: 'Shots Off Target',
+  } as Record<number, string>)[code ?? 0] ?? `#${code}`;
+
+/** Stats that are percentages (already sum to 100), shown as-is rather than split. */
+export const isPercentStat = (code?: number): boolean => code === 100;
+
+/** PBDataMatchStatistic: 1=match, 2=statRange, 3=statType,
+ *  10=homeValue, 11=awayValue, 12=homeTotalValue, 13=awayTotalValue. */
+function decodeDataMatchStatistic(buf: Uint8Array): MatchStat {
+  const out: MatchStat = { statType: 0, statRange: 0 };
+  for (const f of iterFields(buf)) {
+    if (f.field === 2) out.statRange = f.value as number;
+    else if (f.field === 3) out.statType = f.value as number;
+    else if (f.field === 10) out.homeValue = f.value as number;
+    else if (f.field === 11) out.awayValue = f.value as number;
+  }
+  return out;
+}
+
+/** PBMatchStatisticResp: 1 = repeated PBDataMatchStatistic. Keeps only the
+ *  full-match rows (statRange 0) and de-dupes by statType so the UI shows one
+ *  clean comparison per stat. */
+export function decodeMatchStatisticResp(payload: Uint8Array): MatchStats {
+  const seen = new Set<number>();
+  const out: MatchStat[] = [];
+  for (const f of iterFields(payload)) {
+    if (f.field !== 1 || f.wire !== 2) continue;
+    const s = decodeDataMatchStatistic(f.value as Uint8Array);
+    if (s.statRange !== 0 || s.statType === 0) continue;
+    if (seen.has(s.statType)) continue;
+    seen.add(s.statType);
+    out.push(s);
   }
   return out;
 }

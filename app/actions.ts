@@ -9,6 +9,7 @@ import {
   getMatchAnalysis as apiGetMatchAnalysis,
   getMatchLineup as apiGetMatchLineup,
   getMatchEvent as apiGetMatchEvent,
+  getMatchStatistic as apiGetMatchStatistic,
   getStreamDetailFull,
 } from '@/lib/api';
 import {
@@ -19,6 +20,7 @@ import {
   decodeMatchAnalysisResp,
   decodeMatchLineupResp,
   decodeMatchEventResp,
+  decodeMatchStatisticResp,
   decodeDataStream,
   isLiveStatus,
 } from '@/lib/matchProto';
@@ -26,7 +28,7 @@ import { signPlayUrl } from '@/lib/sign';
 import { iterFields, rot47 } from '@/lib/proto';
 import { SPORTS } from '@/lib/sports';
 import { DEFAULT_CONTINENT, DEFAULT_COUNTRY, DEFAULT_SITE_TYPE } from '@/lib/config';
-import type { Match, MatchDetail, MatchAnalysis, MatchLineup, MatchEvents, MatchSource, Stream } from '@/lib/types';
+import type { Match, MatchDetail, MatchAnalysis, MatchLineup, MatchEvents, MatchStats, MatchSource, Stream } from '@/lib/types';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -85,7 +87,7 @@ async function ensureSignatures(sportType: number): Promise<Record<number, strin
   if (cached) return cached;
   // Coalesce concurrent signature fetches for the same sport.
   return withCache(`sig:${key}`, 10 * 60_000, async () => {
-    const r = await getDataBS([100, 102, 105, 106, 107], num(sportType));
+    const r = await getDataBS([100, 102, 104, 105, 106, 107], num(sportType));
     sigCache.set(key, r.signatures);
     return r.signatures;
   });
@@ -248,6 +250,26 @@ export async function getMatchEvent(
     const r = await apiGetMatchEvent(args);
     const data = r.pb?.data ?? r.payload;
     return { ok: true, data: decodeMatchEventResp(data, num(language)) };
+  } catch (e) {
+    return { ok: false, error: errMsg(e) };
+  }
+}
+
+/** Match statistics (endpoint code 104): possession, shots, cards, etc. */
+export async function getMatchStatistic(
+  { matchId, sportType = 1, language = 0 }: MatchDetailParams
+): Promise<Result<MatchStats>> {
+  try {
+    const s = await ensureSignatures(sportType);
+    const args = {
+      version: s[104],
+      matchId: num(matchId),
+      sportType: num(sportType),
+      language: num(language),
+    };
+    const r = await apiGetMatchStatistic(args);
+    const data = r.pb?.data ?? r.payload;
+    return { ok: true, data: decodeMatchStatisticResp(data) };
   } catch (e) {
     return { ok: false, error: errMsg(e) };
   }

@@ -158,6 +158,23 @@ export interface MatchEvent {
 /** Match events payload (PBMatchEventResp, code 105): 1 = repeated PBDataMatchEvent. */
 export type MatchEvents = MatchEvent[];
 
+/** One match statistic row (PBDataMatchStatistic, code 104). */
+export interface MatchStat {
+  /** PBMatchStatType: 100 ball possession, 101 attacks, 102 dangerous attacks,
+   *  103 total shots, 104 shots on target, 105 shots off target, 107 corner kicks,
+   *  108 offsides, 109 yellow cards, 110 red cards, 111 keeper saves, ... */
+  statType: number;
+  /** PBMatchStatRange: 0 = full match, 101 = 1st half, 102 = 2nd half. */
+  statRange: number;
+  /** Home value for the given stat (count, or percent for ball possession). */
+  homeValue?: number;
+  /** Away value for the given stat. */
+  awayValue?: number;
+}
+
+/** Match statistics payload (PBMatchStatisticResp, code 104): 1 = repeated PBDataMatchStatistic. */
+export type MatchStats = MatchStat[];
+
 export interface MatchList {
   list: Match[];
   source: MatchSource;

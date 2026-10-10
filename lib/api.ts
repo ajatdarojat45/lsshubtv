@@ -203,3 +203,10 @@ export function getMatchEvent({ version, matchId, sportType, language }: MatchDe
   const params = md5(qs).slice(0, 6);
   return getProtobuf(`${DATA_API}/sfver${params}${version}/api/match/event?${qs}`);
 }
+
+/** Match statistics (PBMatchStatisticResp, endpoint code 104). */
+export function getMatchStatistic({ version, matchId, sportType, language }: MatchDetailQuery) {
+  const qs = `matchId=${matchId}&sportType=${sportType}&language=${language}`;
+  const params = md5(qs).slice(0, 6);
+  return getProtobuf(`${DATA_API}/sfver${params}${version}/api/match/statistic?${qs}`);
+}

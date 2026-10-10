@@ -1,14 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import type { MatchAnalysis, MatchLineup, MatchEvents, Team } from '@/lib/types';
+import type { MatchAnalysis, MatchLineup, MatchEvents, MatchStats, Team } from '@/lib/types';
 import type { PlayerEventStats } from '@/lib/matchProto';
-import { computePlayerEventStats } from '@/lib/matchProto';
+import { computePlayerEventStats, isLiveStatus } from '@/lib/matchProto';
 import { H2H } from '@/components/H2H';
 import { Lineup } from '@/components/Lineup';
 import { Timeline } from '@/components/Timeline';
+import { Stats } from '@/components/Stats';
 
-type TabId = 'h2h' | 'lineup' | 'timeline';
+type TabId = 'overview' | 'h2h' | 'lineup' | 'timeline';
 
 /** Split a match-events list into per-team player-stat maps (keyed by playerId).
  *  Attributes each event to home/away by teamSide, reusing the shared
@@ -51,36 +52,60 @@ export function MatchTabs({
   analysis,
   lineup,
   events,
+  stats,
   homeTeam,
   awayTeam,
   sportType,
+  matchStatus,
 }: {
   analysis?: MatchAnalysis;
   lineup?: MatchLineup;
   events?: MatchEvents;
+  stats?: MatchStats;
   homeTeam?: Team;
   awayTeam?: Team;
   sportType?: number;
+  matchStatus?: number;
 }) {
-  const [active, setActive] = useState<TabId>('h2h');
+  // `null` = user hasn't picked yet → default to the phase-preferred first tab.
+  const [active, setActive] = useState<TabId | null>(null);
 
+  const hasStats = !!stats && stats.length > 0;
   const hasH2H = !!analysis && analysis.h2h.length > 0;
   const hasLineup = !!lineup && (lineup.home.length > 0 || lineup.away.length > 0);
   const hasTimeline = !!events && events.some((e) =>
     [101, 102, 103, 104, 105, 106, 107, 108, 109, 10020, 10021].includes(e.eventType)
   );
 
-  const tabs: { id: TabId; label: string; show: boolean }[] = [
-    { id: 'h2h', label: 'Head to Head', show: hasH2H },
-    { id: 'lineup', label: 'Lineups', show: hasLineup },
-    { id: 'timeline', label: 'Timeline', show: hasTimeline },
-  ];
-  const available = tabs.filter((t) => t.show);
+  // Tab availability is data-driven; tab ORDER + the default-open tab are
+  // phase-driven — the content people reach for first changes with the match.
+  //   upcoming → Lineups & H2H (probable XI, form) lead; stats/timeline are empty
+  //   live     → Timeline (goals/cards as they happen) leads, then live stats
+  //   finished → Overview (final stat summary) leads, then the goal recap
+  const finished = (matchStatus ?? 0) >= 10000;
+  const live = isLiveStatus(matchStatus);
+  const phaseOrder: TabId[] = finished
+    ? ['overview', 'timeline', 'h2h', 'lineup']
+    : live
+    ? ['timeline', 'overview', 'lineup', 'h2h']
+    : ['lineup', 'h2h', 'overview', 'timeline'];
+
+  const defs: Record<TabId, { label: string; show: boolean }> = {
+    overview: { label: 'Overview', show: hasStats },
+    h2h: { label: 'Head to Head', show: hasH2H },
+    lineup: { label: 'Lineups', show: hasLineup },
+    timeline: { label: 'Timeline', show: hasTimeline },
+  };
+  const available = phaseOrder
+    .map((id) => ({ id, ...defs[id] }))
+    .filter((t) => t.show);
   if (!available.length) return null;
 
-  const stats = teamStats(events);
+  const stats2 = teamStats(events);
   const content = (id: TabId) => {
     switch (id) {
+      case 'overview':
+        return <Stats stats={stats!} homeTeam={homeTeam} awayTeam={awayTeam} />;
       case 'h2h':
         return <H2H analysis={analysis!} homeTeam={homeTeam} awayTeam={awayTeam} />;
       case 'lineup':
@@ -90,8 +115,8 @@ export function MatchTabs({
             homeTeam={homeTeam}
             awayTeam={awayTeam}
             sportType={sportType}
-            homeStats={stats.home}
-            awayStats={stats.away}
+            homeStats={stats2.home}
+            awayStats={stats2.away}
           />
         );
       case 'timeline':
@@ -105,8 +130,10 @@ export function MatchTabs({
   // outer panel margin since it sits where the strip would have).
   if (available.length === 1) return content(available[0].id);
 
-  // Keep the active tab valid if data arrives/changes.
-  const current = available.some((t) => t.id === active) ? active : available[0].id;
+  // Keep the active tab valid if data arrives/changes. Until the user picks one,
+  // `active` is null → show the phase-preferred first available tab.
+  const current =
+    active && available.some((t) => t.id === active) ? active : available[0].id;
 
   return (
     <div className="mb-4">

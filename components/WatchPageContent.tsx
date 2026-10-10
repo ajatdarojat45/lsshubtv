@@ -7,7 +7,7 @@ import { CircleCheck, Loader2, RefreshCw, Share2, ThumbsUp, X } from 'lucide-rea
 import { useRB } from '@/components/RBProvider';
 import { Countdown, MatchRow, StatusBadge } from '@/components/Match';
 import { isLiveStatus, isStarted, matchDateMs, isPlayable, statusLabel } from '@/lib/matchProto';
-import { useSportMatches, useMatchDetail, useMatchAnalysis, useMatchLineup, useMatchEvent, useStreamUrl } from '@/lib/queries';
+import { useSportMatches, useMatchDetail, useMatchAnalysis, useMatchLineup, useMatchEvent, useMatchStatistic, useStreamUrl } from '@/lib/queries';
 import { sportSlug, sportLabel } from '@/lib/sports';
 import VideoPlayer from '@/components/VideoPlayer';
 import AdBanner from '@/components/AdBanner';
@@ -65,6 +65,7 @@ export function WatchPageContent({ id }: { id: string }) {
   const analysisQuery = useMatchAnalysis(matchId, sportType);
   const lineupQuery = useMatchLineup(matchId, sportType);
   const eventQuery = useMatchEvent(matchId, sportType);
+  const statisticQuery = useMatchStatistic(matchId, sportType);
   const streamMutation = useStreamUrl();
 
   const detail = detailQuery.data;
@@ -322,9 +323,11 @@ export function WatchPageContent({ id }: { id: string }) {
             analysis={analysisQuery.data}
             lineup={lineupQuery.data}
             events={eventQuery.data}
+            stats={statisticQuery.data}
             homeTeam={match?.home}
             awayTeam={match?.away}
             sportType={sportType}
+            matchStatus={match?.status}
           />
 
           {/* Big ad — above the related matches */}
