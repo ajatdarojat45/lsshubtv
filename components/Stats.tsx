@@ -23,12 +23,14 @@ function TeamLogo({ name, logo, size = 'h-6 w-6' }: { name?: string; logo?: stri
   );
 }
 
-/** Team label; home is right-aligned (value on its left edge), away left-aligned. */
+/** Team label with the logo on the OUTER side of the name: home logo on the
+ *  left of the home name, away logo on the right of the away name.
+ *  Same position as the Timeline tab header. */
 function TeamChip({ name, logo, align }: { name?: string; logo?: string; align: 'home' | 'away' }) {
   return (
     <span
       className={`inline-flex min-w-0 items-center gap-2 ${
-        align === 'home' ? 'flex-row-reverse text-right' : ''
+        align === 'away' ? 'flex-row-reverse text-right' : ''
       }`}
     >
       <TeamLogo name={name} logo={logo} />

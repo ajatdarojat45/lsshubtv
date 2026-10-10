@@ -9,8 +9,13 @@ import { computeH2HSummary, formatMatchDate } from '@/lib/matchProto';
 const PANEL =
   'mb-4 rounded border border-border bg-panel px-5 py-5 max-[640px]:px-3.5 max-[640px]:py-3.5';
 
+/** Logo sizes — kept identical to the match-card `LOGO_SIZE` tokens:
+ *  team `h-6 w-6 rounded-md`, league `h-4 w-4 rounded-[4px]`, monogram `text-[11px]`. */
+const TEAM_LOGO_SIZE = 'h-6 w-6';
+const LEAGUE_LOGO_SIZE = 'h-4 w-4';
+
 /** Team logo with a monogram fallback. */
-function TeamLogo({ name, logo, size = 'h-6 w-6' }: { name?: string; logo?: string; size?: string }) {
+function TeamLogo({ name, logo, size = TEAM_LOGO_SIZE }: { name?: string; logo?: string; size?: string }) {
   if (logo) {
     return <img src={logo} alt={name ?? ''} loading="lazy" className={`${size} shrink-0 rounded-md object-contain`} />;
   }
@@ -23,61 +28,67 @@ function TeamLogo({ name, logo, size = 'h-6 w-6' }: { name?: string; logo?: stri
   );
 }
 
-/** Compact team label used in the W/D/L summary header. */
+/** Compact team label used in the W/D/L summary header. Typography/spacing
+ *  matches the match-card `TEAM_SIDE`/`TEAM_NAME` constants. */
 function TeamChip({ name, logo, align }: { name?: string; logo?: string; align: 'home' | 'away' }) {
   return (
     <span
-      className={`inline-flex min-w-0 items-center gap-2 ${
+      className={`inline-flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-ellipsis ${
         align === 'home' ? 'flex-row-reverse text-right' : ''
       }`}
     >
       <TeamLogo name={name} logo={logo} />
-      <span className="min-w-0 truncate text-[14px] font-semibold">{name ?? '—'}</span>
+      <span className="min-w-0 overflow-hidden whitespace-nowrap text-ellipsis text-[14px] font-semibold">{name ?? '—'}</span>
     </span>
   );
 }
 
 /** One past meeting: home : away, date, and (above the score) the competition
- *  they met in. */
+ *  they met in. Structure mirrors the match card: league row on top
+ *  (full-width, centred), then the team grid, then the date row — with the
+ *  same sizes/margins (mb-2 / min-w-[72px] / mt-2) so positions stay fixed. */
 function MeetingRow({ m }: { m: Match }) {
   const league = m.league;
   const stage = m.stage || m.round || m.group;
   const competition = league?.name || stage;
   return (
-    <div className="rounded-lg border-b border-[rgba(0,0,0,0.06)] bg-card px-3.5 py-2.5 last:border-b-0 [[data-theme=dark]_&]:border-[rgba(255,255,255,0.08)]">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
-        <div className="flex min-w-0 justify-end">
-          <TeamChip name={m.home?.name} logo={m.home?.logo} align="home" />
-        </div>
-
-        {/* Competition + score stacked in the middle column: the league/competition
-            they met in sits directly above the scoreline. */}
-        <div className="flex min-w-0 flex-col items-center px-1">
-          {competition && (
-            <span className="mb-0.5 flex max-w-[160px] items-center gap-1 text-[11px] leading-tight text-muted">
-              {league?.logo && (
-                <img
-                  src={league.logo}
-                  alt=""
-                  loading="lazy"
-                  className="h-3.5 w-3.5 shrink-0 rounded-sm object-contain"
-                />
-              )}
-              <span className="min-w-0 truncate">
-                {league?.name ?? competition}
-                {stage && league?.name ? ` · ${stage}` : ''}
-              </span>
+    <div className="block w-full rounded-lg border border-l-[3px] border-border border-l-[#9ca3af] bg-card px-3.5 py-2.5">
+      <div className="flex min-w-0 flex-col">
+        {competition && (
+          <span className="mb-2 flex items-center justify-center gap-1 text-[11px] leading-tight text-muted">
+            {league?.logo && (
+              <img
+                src={league.logo}
+                alt=""
+                loading="lazy"
+                className={`${LEAGUE_LOGO_SIZE} shrink-0 rounded-[4px] object-contain`}
+              />
+            )}
+            <span className="min-w-0 max-w-[260px] truncate">
+              {league?.name ?? competition}
+              {stage && league?.name ? ` · ${stage}` : ''}
             </span>
-          )}
-          <span className="whitespace-nowrap text-[15px] font-extrabold tabular-nums">
-            {m.homeScore ?? 0} : {m.awayScore ?? 0}
           </span>
-          <span className="text-[11px] text-muted">{formatMatchDate(m.matchDate)}</span>
+        )}
+        <div className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+          <div className="flex min-w-0 justify-end">
+            <TeamChip name={m.home?.name} logo={m.home?.logo} align="home" />
+          </div>
+
+          <div className="flex min-w-[72px] items-center justify-center px-1">
+            <span className="whitespace-nowrap text-[15px] font-extrabold tabular-nums">
+              {m.homeScore ?? 0} : {m.awayScore ?? 0}
+            </span>
+          </div>
+
+          <div className="flex min-w-0">
+            <TeamChip name={m.away?.name} logo={m.away?.logo} align="away" />
+          </div>
         </div>
 
-        <div className="flex min-w-0">
-          <TeamChip name={m.away?.name} logo={m.away?.logo} align="away" />
-        </div>
+        <span className="mt-2 flex justify-center">
+          <span className="text-[11px] text-muted">{formatMatchDate(m.matchDate)}</span>
+        </span>
       </div>
     </div>
   );
@@ -164,7 +175,7 @@ export function H2H({
         </button>
 
         {open && (
-          <div className="mt-2 flex flex-col gap-1.5">
+          <div className="mt-2 flex flex-col gap-2">
             {h2h.map((m) => (
               <MeetingRow key={m.matchId} m={m} />
             ))}

@@ -4,7 +4,7 @@ import { useState, useEffect, type CSSProperties } from 'react';
 import { Flame } from 'lucide-react';
 import { statusLabel, isLiveStatus, isStarted, formatMatchDate } from '@/lib/matchProto';
 import { countryLogoUrl, teamLogoUrl } from '@/lib/logos';
-import { sportColor, sportIcon, sportLabel, sportIsScoring } from '@/lib/sports';
+import { sportColor, sportLabel, sportIsScoring } from '@/lib/sports';
 import type { Match, Team } from '@/lib/types';
 /* ------------------------------------------------------------------------- *
  * Shared Tailwind class strings — replacements for the retired custom CSS
@@ -32,8 +32,9 @@ const TEAM_SIDE =
   'inline-flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-ellipsis';
 /** `.row-team-member` */
 const TEAM_MEMBER = 'inline-flex min-w-0 items-center gap-1.5';
-/** `.row-team-name` */
-const TEAM_NAME = 'min-w-0 overflow-hidden whitespace-nowrap text-ellipsis';
+/** `.row-team-name` — typography (14px/semibold) matches the H2H `TeamChip`. */
+const TEAM_NAME =
+  'min-w-0 overflow-hidden whitespace-nowrap text-ellipsis text-[14px] font-semibold';
 
 /** `.status` pill (shared base). */
 const STATUS =
@@ -46,9 +47,11 @@ const STATUS_LIVE = `${STATUS} bg-[var(--live-soft)] text-[#d93025] [[data-theme
 const STATUS_DOT =
   'h-[7px] w-[7px] shrink-0 rounded-full bg-current animate-[blink_1.2s_infinite]';
 
-/** `.match-row` base — responsive grid-areas stay in globals.css (unlayered). */
+/** `.match-row` base — single-column card; all info lives in the centred
+ *  content (the side icon columns were removed as duplicates of the centre).
+ *  Card chrome (radius/padding) and typography mirror the H2H `MeetingRow`. */
 const ROW_BASE =
-  'match-row grid w-full grid-cols-[120px_1fr_auto] items-center gap-2.5 rounded-xl border border-l-[3px] bg-card px-4 py-3 text-left transition-[border-color,transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow max-[1024px]:grid-cols-[110px_1fr_auto] max-[1024px]:px-3.5 max-[768px]:grid-cols-[1fr_auto] max-[768px]:gap-x-3 max-[768px]:gap-y-2';
+  'block w-full rounded-lg border border-l-[3px] bg-card px-3.5 py-2.5 text-left transition-[border-color,transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow max-[1024px]:px-3.5';
 /** `.match-row` (upcoming/idle) — sport-coloured left accent only. */
 const ROW = `${ROW_BASE} border-border border-l-[color:var(--sport-color,transparent)] hover:border-[#c7ccd2]`;
 /** `.match-row.is-live` — live is the exception: the whole border (all sides)
@@ -56,19 +59,6 @@ const ROW = `${ROW_BASE} border-border border-l-[color:var(--sport-color,transpa
 const ROW_LIVE = `${ROW_BASE} border-[color:var(--live)]`;
 /** `.match-row` finished — muted gray left accent only (other sides normal). */
 const ROW_FINISHED = `${ROW_BASE} border-border border-l-[#9ca3af]`;
-/** `.row-date` (grid-area placement stays in globals.css) */
-const ROW_DATE =
-  'row-date flex min-w-0 flex-col items-start gap-[5px] whitespace-nowrap text-xs text-muted';
-/** `.row-sport` sport pill — tinted per-sport color is applied inline in
- *  MatchRow (backgroundColor = sportColor + alpha, color = sportColor). */
-const ROW_SPORT =
-  'row-sport inline-flex max-w-full items-center gap-[5px] whitespace-nowrap rounded-full px-2 py-[2px]';
-/** `.row-main` (grid-area placement stays in globals.css) */
-const ROW_MAIN = 'row-main flex min-w-0 flex-col gap-1';
-/** `.row-status` (grid-area placement stays in globals.css) */
-const ROW_STATUS = 'row-status flex items-center gap-2 justify-self-end';
-/** `.row-team` (home side; `.row-team.away` adds justify-end) */
-const ROW_TEAM = 'flex min-w-0 items-center gap-2 text-[15px] font-bold';
 
 /** `.sk` shimmer block (pseudo-element rendered via `after:` utilities). */
 const SK =
@@ -111,17 +101,45 @@ export function TeamLogo({
 
 /** One side of a versus matchup. Singles render one logo+name; doubles
  * (tennis/badminton ganda) stack every player/team with their logo, matching
- * the app's "name[0] / name[2]" vs "name[1] / name[3]" pairing. */
-function TeamSide({ teams, sportType, size = 'rowTeam' }: { teams?: Team[]; sportType?: number; size?: LogoSize }) {
+ * the app's "name[0] / name[2]" vs "name[1] / name[3]" pairing.
+ *
+ * `align` mirrors the H2H `TeamChip`: the home side is reversed
+ * (`flex-row-reverse`) so the home logo sits on the outer edge — to the right
+ * of the home name, away from the centre score. The away side keeps its logo
+ * on the inner edge (left of the away name, next to the score). */
+function TeamSide({
+  teams,
+  sportType,
+  size = 'rowTeam',
+  align = 'away',
+}: {
+  teams?: Team[];
+  sportType?: number;
+  size?: LogoSize;
+  align?: 'home' | 'away';
+}) {
   const list = teams?.length ? teams : [];
   if (!list.length) return <span className={TEAM_NAME}>{'?'}</span>;
   return (
-    <span className={TEAM_SIDE}>
+    <span
+      className={`${TEAM_SIDE} ${
+        align === 'home' ? 'flex-row-reverse text-right' : ''
+      }`}
+    >
       {list.map((t, i) => (
         <span className={TEAM_MEMBER} key={t.teamId ?? t.playerId ?? i}>
           {i > 0 && <span className="mr-1.5 font-bold opacity-60">/</span>}
-          <TeamLogo path={t.logo} name={t.name} sportType={sportType} size={size} />
-          <span className={TEAM_NAME}>{t.name || '?'}</span>
+          {align === 'home' ? (
+            <>
+              <span className={TEAM_NAME}>{t.name || '?'}</span>
+              <TeamLogo path={t.logo} name={t.name} sportType={sportType} size={size} />
+            </>
+          ) : (
+            <>
+              <TeamLogo path={t.logo} name={t.name} sportType={sportType} size={size} />
+              <span className={TEAM_NAME}>{t.name || '?'}</span>
+            </>
+          )}
         </span>
       ))}
     </span>
@@ -170,16 +188,13 @@ export function Countdown({ targetMs }: { targetMs: number }) {
 export function MatchRowSkeleton() {
   return (
     <div className={ROW}>
-      <div className={`${SK} h-3 w-[30%]`} />
-      <div className={ROW_MAIN}>
-        <div className={`${SK} h-3 w-1/2`} />
-        <div className="flex items-center gap-2.5">
-          <div className={`${SK} h-6 w-6 shrink-0 rounded-md`} />
-          <div className={`${SK} h-3 w-[70%]`} />
-          <div className={`${SK} ml-auto h-[18px] w-11 rounded-md`} />
-        </div>
+      <div className={`${SK} mx-auto h-3 w-1/2`} />
+      <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+        <div className={`${SK} h-3 w-full`} />
+        <div className={`${SK} h-[18px] w-11 rounded-md`} />
+        <div className={`${SK} h-3 w-full`} />
       </div>
-      <div className={`${SK} h-3 w-2/5`} />
+      <div className={`${SK} mx-auto mt-2 h-3 w-1/4`} />
     </div>
   );
 }
@@ -199,7 +214,6 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
   const league = match.league?.name || match.name || match.title || '—';
   const eventName = match.title || match.name || match.league?.name || '—';
   const sportName = sportLabel(match.sportType);
-  const SportIcon = sportIcon(match.sportType);
   const color = sportColor(match.sportType);
   const scoring = sportIsScoring(match.sportType);
   return (
@@ -209,42 +223,55 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
       style={{ '--sport-color': color } as CSSProperties}
       onClick={onClick}
     >
-      <span className={ROW_DATE}>
-        <span className={ROW_SPORT} style={{ backgroundColor: `${color}26`, color }} title={sportName}>
-          <SportIcon className="h-[13px] w-[13px] shrink-0" />
-          <span className="truncate">{sportName}</span>
-        </span>
-        <span className="max-[768px]:hidden">{formatMatchDate(match.matchDate)}</span>
-      </span>
-
-      <span className={ROW_MAIN}>
-        <span className="flex min-w-0 items-center justify-center gap-1.5 text-xs font-semibold text-muted">
-          <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
-          <span className="truncate">{league}</span>
-        </span>
-
+      <span className="block min-w-0">
         {scoring ? (
-          <span className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5">
-            <span className={ROW_TEAM}>
-              <TeamSide teams={match.homeTeams?.length ? match.homeTeams : match.home ? [match.home] : []} sportType={match.sportType} />
+          <span className="flex min-w-0 flex-col">
+            {/* League row lives OUTSIDE the team grid (full-width, centred) so
+                its text length never changes the centre-column width — the team
+                logo/name positions stay fixed. Only the score sets the centre
+                width (with a min-width so "VS" / short scores align too). */}
+            <span className="mb-2 flex items-center justify-center gap-1 text-[11px] leading-tight text-muted">
+              {match.hot && <Flame className="h-3.5 w-3.5 shrink-0 text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]" />}
+              <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
+              <span className="min-w-0 max-w-[260px] truncate">{sportName}{' · '}{league}</span>
             </span>
-            {started ? (
-              <span className="whitespace-nowrap text-[17px] font-extrabold tabular-nums">{score(match.homeScore)} : {score(match.awayScore)}</span>
-            ) : (
-              <span className="whitespace-nowrap text-[13px] font-bold uppercase tracking-[0.08em] text-muted">VS</span>
-            )}
-            <span className={`${ROW_TEAM} justify-end`}>
-              <TeamSide teams={match.awayTeams?.length ? match.awayTeams : match.away ? [match.away] : []} sportType={match.sportType} />
+            <span className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+              <span className="flex min-w-0 justify-end">
+                <TeamSide teams={match.homeTeams?.length ? match.homeTeams : match.home ? [match.home] : []} sportType={match.sportType} align="home" />
+              </span>
+              <span className="flex min-w-[72px] items-center justify-center px-1">
+                {started ? (
+                  <span className="whitespace-nowrap text-[15px] font-extrabold tabular-nums">{score(match.homeScore)} : {score(match.awayScore)}</span>
+                ) : (
+                  <span className="whitespace-nowrap text-[13px] font-bold uppercase tracking-[0.08em] text-muted">VS</span>
+                )}
+              </span>
+              <span className="flex min-w-0">
+                <TeamSide teams={match.awayTeams?.length ? match.awayTeams : match.away ? [match.away] : []} sportType={match.sportType} align="away" />
+              </span>
+            </span>
+            <span className="mt-2 flex justify-center">
+              {live ? (
+                <span className="whitespace-nowrap text-[11px] font-semibold text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]">{statusLabel(match.status)}</span>
+              ) : (
+                <span className="text-[11px] text-muted">{formatMatchDate(match.matchDate)}</span>
+              )}
             </span>
           </span>
         ) : (
-          <span className="truncate text-[15px] font-bold" title={eventName}>{eventName}</span>
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted">
+              <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
+              <span className="truncate">{sportName}{' · '}{league}</span>
+            </span>
+            <span className="truncate text-[15px] font-bold" title={eventName}>{eventName}</span>
+            {live ? (
+              <span className="whitespace-nowrap text-[11px] font-semibold text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]">{statusLabel(match.status)}</span>
+            ) : (
+              <span className="text-[11px] text-muted">{formatMatchDate(match.matchDate)}</span>
+            )}
+          </span>
         )}
-      </span>
-
-      <span className={ROW_STATUS}>
-        {match.hot && <Flame className="h-3.5 w-3.5 shrink-0" />}
-        <StatusBadge status={match.status} />
       </span>
     </button>
   );

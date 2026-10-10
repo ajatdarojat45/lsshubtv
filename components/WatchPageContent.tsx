@@ -22,11 +22,12 @@ const PANEL_EMPTY =
 /** Inline error banner (`.error-banner`). */
 const ERROR_BANNER =
   'mb-4 rounded-xl border border-[rgba(239,68,68,0.45)] bg-[rgba(239,68,68,0.12)] px-4 py-3 text-[13px] whitespace-pre-wrap break-words text-[#c5221f] [[data-theme=dark]_&]:border-[#ef4444] [[data-theme=dark]_&]:bg-[rgba(255,255,255,0.08)] [[data-theme=dark]_&]:text-[#fca5a5]';
-/** Channel pill in the player overlay (`.channel-item`). */
+/** Channel label in the player overlay — plain text (no pill). A text-shadow
+ * keeps it legible over bright video; the active channel is cyan + underlined. */
 const CHANNEL_BASE =
-  'pointer-events-auto inline-flex max-w-full items-center overflow-hidden whitespace-nowrap text-ellipsis rounded-full px-3.5 py-1.5 text-[12px] font-semibold text-white backdrop-blur-[4px] transition-colors duration-150';
-const CHANNEL_IDLE = `${CHANNEL_BASE} bg-[rgba(0,0,0,0.55)] hover:bg-[rgba(0,0,0,0.75)]`;
-const CHANNEL_ACTIVE = `${CHANNEL_BASE} bg-[rgba(34,211,238,0.55)]`;
+  'pointer-events-auto inline-block max-w-full cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] transition-opacity duration-150';
+const CHANNEL_IDLE = `${CHANNEL_BASE} opacity-70 hover:opacity-100`;
+const CHANNEL_ACTIVE = `${CHANNEL_BASE} text-[#22d3ee] underline decoration-2 underline-offset-4`;
 /** Action pill under the video (`.watch-action-btn`). */
 const ACTION_BASE =
   'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-all duration-150';
@@ -127,19 +128,44 @@ export function WatchPageContent({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streams, live]);
 
-  // Related matches — live first (priority), then upcoming (soonest first).
-  const relatedMatches = (matchesQuery.data?.list ?? [])
-    .filter((m) => String(m.matchId) !== String(matchId) && (isLiveStatus(m.status) || !m.status))
-    .sort((a, b) => {
-      const rank = (m: Match): number => (isLiveStatus(m.status) ? 0 : 1);
-      const ra = rank(a);
-      const rb = rank(b);
-      if (ra !== rb) return ra - rb;
-      const byTime = (x: Match, y: Match): number =>
-        (matchDateMs(x.matchDate) ?? Infinity) - (matchDateMs(y.matchDate) ?? Infinity);
-      return byTime(a, b);
-    })
+  // Related matches — adaptive, relevance-ranked (mirrors the adaptive tab
+  // ordering). Instead of hard-picking ONE tier (which can leave the rail
+  // half-empty), every candidate gets a relevance score and we keep the best
+  // few. Priority: live-ness is dominant (live before upcoming), then
+  // competition relevance (same league before same category):
+  //   0 · live     + same league      (most relevant)
+  //   1 · live     + same category
+  //   2 · upcoming + same league
+  //   3 · upcoming + same category
+  //   4 · finished (last resort — rarely present on the live list)
+  // Ties break by soonest kickoff (live → most mature first; upcoming → next up).
+  const leagueId = match?.league?.leagueId;
+  const others = (matchesQuery.data?.list ?? []).filter(
+    (m) => String(m.matchId) !== String(matchId)
+  );
+  const relevance = (m: Match): number => {
+    const sameLeague = leagueId !== undefined && m.league?.leagueId === leagueId;
+    if (isLiveStatus(m.status)) return sameLeague ? 0 : 1;
+    if (!isStarted(m.status)) return sameLeague ? 2 : 3; // not live & not finished = upcoming
+    return 4; // finished
+  };
+  const bySoonest = (a: Match, b: Match): number =>
+    (matchDateMs(a.matchDate) ?? Infinity) - (matchDateMs(b.matchDate) ?? Infinity);
+
+  const relatedMatches = [...others]
+    .sort((a, b) => relevance(a) - relevance(b) || bySoonest(a, b))
     .slice(0, 6);
+
+  // Heading reflects the TOP tier actually present, so the context is explicit.
+  const topTier = relatedMatches.length ? relevance(relatedMatches[0]) : 4;
+  const relatedLabel =
+    topTier === 0
+      ? 'Live in this competition'
+      : topTier === 1
+        ? 'Live matches'
+        : topTier <= 3
+          ? 'Upcoming matches'
+          : 'Recently finished';
 
   const slug = sportType > 0 ? sportSlug(sportType) : '';
   const backHref = slug ? `/sports/${slug}` : '/';
@@ -248,7 +274,7 @@ export function WatchPageContent({ id }: { id: string }) {
               )}
 
               {live && streams.length > 0 && (
-                <div className="pointer-events-none absolute right-3 top-1/2 z-[5] flex max-h-[calc(100%-24px)] max-w-[50%] -translate-y-1/2 flex-col items-end gap-1.5 overflow-y-auto">
+                <div className="pointer-events-none absolute right-3 top-1/2 z-[5] flex max-h-[calc(100%-24px)] max-w-[50%] -translate-y-1/2 flex-col items-end gap-2 overflow-y-auto">
                   {streams.map((s, i) => {
                     const active = playing?.key === i;
                     return (
@@ -336,7 +362,7 @@ export function WatchPageContent({ id }: { id: string }) {
           {/* Related matches (live/upcoming) */}
           {relatedMatches.length > 0 && (
             <section className={PANEL}>
-              <h3 className="mb-3 text-[15px] font-bold">Related matches</h3>
+              <h3 className="mb-3 text-[15px] font-bold">{relatedLabel}</h3>
               <div className="flex flex-col gap-2">
                 {relatedMatches.map((m, i) => (
                   <MatchRow

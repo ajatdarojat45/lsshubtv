@@ -120,7 +120,7 @@ export function MatchTabs({
           />
         );
       case 'timeline':
-        return <Timeline events={events!} sportType={sportType} />;
+        return <Timeline events={events!} sportType={sportType} homeTeam={homeTeam} awayTeam={awayTeam} />;
       default:
         return null;
     }

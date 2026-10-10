@@ -3,13 +3,42 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { MatchEvent, MatchEvents } from '@/lib/types';
+import type { MatchEvent, MatchEvents, Team } from '@/lib/types';
 import { eventMinute, eventTypeLabel } from '@/lib/matchProto';
 import { playerAvatarUrl } from '@/lib/logos';
 
 /** Surface panel, matching the `.panel` style used across the detail page. */
 const PANEL =
   'mb-4 rounded border border-border bg-panel px-5 py-5 max-[640px]:px-3.5 max-[640px]:py-3.5';
+
+/** Team logo with a monogram fallback. */
+function TeamLogo({ name, logo }: { name?: string; logo?: string }) {
+  if (logo) {
+    return <img src={logo} alt={name ?? ''} loading="lazy" className="h-6 w-6 shrink-0 rounded-md object-contain" />;
+  }
+  return (
+    <span
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#e8eaed] text-[11px] font-bold text-muted [[data-theme=dark]_&]:bg-border-soft"
+    >
+      {(name ?? '?').charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+/** Team label with the logo on the OUTER side of the name: home logo on the
+ *  left of the home name, away logo on the right of the away name. */
+function TeamChip({ name, logo, align }: { name?: string; logo?: string; align: 'home' | 'away' }) {
+  return (
+    <span
+      className={`inline-flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-ellipsis ${
+        align === 'away' ? 'flex-row-reverse text-right' : ''
+      }`}
+    >
+      <TeamLogo name={name} logo={logo} />
+      <span className="min-w-0 overflow-hidden whitespace-nowrap text-ellipsis text-[14px] font-semibold">{name ?? '—'}</span>
+    </span>
+  );
+}
 
 /** Events that are worth showing on the timeline (skip the bookkeeping noise
  *  like kick-off / half-time / full-time markers). */
@@ -173,9 +202,13 @@ function EventRow({
 export function Timeline({
   events,
   sportType,
+  homeTeam,
+  awayTeam,
 }: {
   events: MatchEvents;
   sportType?: number;
+  homeTeam?: Team;
+  awayTeam?: Team;
 }) {
   const [open, setOpen] = useState(true);
   const list = [...events]
@@ -205,7 +238,18 @@ export function Timeline({
       </button>
 
       {open && (
-      <div className="relative">
+      <>
+        {/* Team legend — same header pattern as the Stats/H2H tabs: home on the
+            left, away on the right, aligned with the event columns below. */}
+        <div className="mt-3 mb-3 flex items-center gap-2.5">
+          <div className="flex min-w-0 flex-1">
+            <TeamChip name={homeTeam?.name} logo={homeTeam?.logo} align="home" />
+          </div>
+          <div className="flex min-w-0 flex-1 justify-end">
+            <TeamChip name={awayTeam?.name} logo={awayTeam?.logo} align="away" />
+          </div>
+        </div>
+      <div className="relative mt-1">
         {/* Vertical timeline line down the centre. The centre spine column is
             exactly half the width (both side columns are equal 1fr), so this
             line meets every event's dot. Each dot's ring masks the line where
@@ -225,6 +269,7 @@ export function Timeline({
           ))}
         </div>
       </div>
+      </>
       )}
     </section>
   );
