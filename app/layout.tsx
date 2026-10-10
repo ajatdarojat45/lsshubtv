@@ -20,8 +20,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const stored = typeof window !== 'undefined' ? localStorage.getItem('rb-theme') : null;
+  const initialTheme: string = stored || (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
   return (
-    <html lang="en">
+    <html lang="en" data-theme={initialTheme} cz-shortcut-listen="true">
       <body>
         <QueryProvider>
           <RBProvider>
