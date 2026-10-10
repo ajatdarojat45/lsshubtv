@@ -48,6 +48,34 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   </header>
                   <SportNav />
                   <main className="app-content">{children}</main>
+                  <footer className="app-footer">
+                    <div className="footer-grid">
+                      <div className="footer-col">
+                        <h3 className="footer-title">Categories</h3>
+                        <FooterCategories />
+                      </div>
+                      <div className="footer-col">
+                        <h3 className="footer-title">Contact Us</h3>
+                        <ul className="footer-links">
+                          <li>
+                            <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="footer-col">
+                        <h3 className="footer-title">Terms</h3>
+                        <ul className="footer-links">
+                          <li>
+                            <Link href="/privacy">Privacy Policy</Link>
+                          </li>
+                          <li>
+                            <Link href="/terms">Terms of Service</Link>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                    <p>LSSHubTV 3.0.323 · Streaming via local proxy</p>
+                  </footer>
                 </div>
                 <aside className="gutter gutter-right" aria-label="Advertisement">
                   <div className="gutter-sticky">
@@ -55,34 +83,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   </div>
                 </aside>
               </div>
-              <footer className="app-footer">
-                <div className="footer-grid">
-                  <div className="footer-col">
-                    <h3 className="footer-title">Categories</h3>
-                    <FooterCategories />
-                  </div>
-                  <div className="footer-col">
-                    <h3 className="footer-title">Contact Us</h3>
-                    <ul className="footer-links">
-                      <li>
-                        <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="footer-col">
-                    <h3 className="footer-title">Terms</h3>
-                    <ul className="footer-links">
-                      <li>
-                        <Link href="/privacy">Privacy Policy</Link>
-                      </li>
-                      <li>
-                        <Link href="/terms">Terms of Service</Link>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                <p>LSSHubTV 3.0.323 · Streaming via local proxy</p>
-              </footer>
             </div>
           </RBProvider>
         </QueryProvider>
