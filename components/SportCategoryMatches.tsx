@@ -3,9 +3,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Radio, Clock, CircleCheck, Loader2, RefreshCw, Inbox, type LucideIcon } from 'lucide-react';
+import { Radio, Clock, CircleCheck, Loader2, RefreshCw, Inbox, ChevronDown, type LucideIcon } from 'lucide-react';
 import { useRB } from '@/components/RBProvider';
-import { MatchRow, MatchRowSkeleton } from '@/components/Match';
+import { MatchRowSkeleton } from '@/components/Match';
+import { groupMatchesByLeague, LeagueGroupSection } from '@/components/LeagueGroup';
 import { isLiveStatus, matchDateMs } from '@/lib/matchProto';
 import { useSportMatches } from '@/lib/queries';
 import AdBanner from '@/components/AdBanner';
@@ -61,6 +62,53 @@ interface SportCategoryMatchesProps {
   sportType: number;
   category: string;
   label: string;
+}
+
+/** Render one Live/Upcoming/Finished status group. Every group is split into
+ *  per-league sub-sections so the league name shows once per header,
+ *  not per card. The status header is a toggle — collapsed groups show only
+ *  the header row. Live stays open by default; upcoming/finished start
+ *  collapsed when the list is long so the page scans faster. */
+function StatusGroupSection({
+  group,
+  onMatchClick,
+  defaultOpen,
+}: {
+  group: MatchGroup;
+  onMatchClick: (m: Match) => void;
+  defaultOpen?: boolean;
+}) {
+  const leagueGroups = useMemo(
+    () => groupMatchesByLeague(group.items),
+    [group.items]
+  );
+  const [open, setOpen] = useState(defaultOpen ?? group.isLive);
+  return (
+    <section className="mb-[22px]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="mb-2.5 flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-border-soft/60"
+      >
+        <span className={group.isLive ? GROUP_TITLE_LIVE : GROUP_TITLE}>
+          <group.icon className="h-[15px] w-[15px]" />
+          {group.label}
+          <span className="rounded-full border border-border bg-panel px-2 py-px text-[11px] font-bold text-muted">{group.items.length}</span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted transition-transform duration-200 ${open ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-4">
+          {leagueGroups.map((lg) => (
+            <LeagueGroupSection key={lg.key} group={lg} onMatchClick={onMatchClick} defaultOpen={group.isLive} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 /** Match list for /sports/[category] — the same layout as the home page
@@ -224,24 +272,10 @@ export function SportCategoryMatches({ sportType, category, label }: SportCatego
 
       {groups.map((g, idx) => (
         <Fragment key={g.key}>
-          <section className="mb-[22px]">
-            <header className="mb-2.5 flex items-center justify-between">
-              <span className={g.isLive ? GROUP_TITLE_LIVE : GROUP_TITLE}>
-                <g.icon className="h-[15px] w-[15px]" />
-                {g.label}
-                <span className="rounded-full border border-border bg-panel px-2 py-px text-[11px] font-bold text-muted">{g.items.length}</span>
-              </span>
-            </header>
-            <div className="flex flex-col gap-2">
-              {g.items.map((m, i) => (
-                <MatchRow
-                  key={`${m.matchId}-${i}`}
-                  match={m}
-                  onClick={() => router.push(`/watch/${m.matchId}?sport=${m.sportType ?? sportType}`)}
-                />
-              ))}
-            </div>
-          </section>
+          <StatusGroupSection
+            group={g}
+            onMatchClick={(m) => router.push(`/watch/${m.matchId}?sport=${m.sportType ?? sportType}`)}
+          />
 
           {/* In-feed banner — between the first group and the rest of the list. */}
           {idx === 0 && groups.length > 1 && (

@@ -5,7 +5,8 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CircleCheck, Loader2, RefreshCw, Share2, ThumbsUp, X } from 'lucide-react';
 import { useRB } from '@/components/RBProvider';
-import { Countdown, MatchRow, StatusBadge } from '@/components/Match';
+import { Countdown, StatusBadge } from '@/components/Match';
+import { groupMatchesByLeague, LeagueGroupSection } from '@/components/LeagueGroup';
 import { isLiveStatus, isStarted, matchDateMs, isPlayable, statusLabel } from '@/lib/matchProto';
 import { useSportMatches, useMatchDetail, useMatchAnalysis, useMatchLineup, useMatchEvent, useMatchStatistic, useStreamUrl } from '@/lib/queries';
 import { sportSlug, sportLabel } from '@/lib/sports';
@@ -359,16 +360,16 @@ export function WatchPageContent({ id }: { id: string }) {
           {/* Big ad — above the related matches */}
           <AdBanner slotId="watch-above-related" category={slug} size="rectangle" />
 
-          {/* Related matches (live/upcoming) */}
+          {/* Related matches (live/upcoming) — grouped by league name */}
           {relatedMatches.length > 0 && (
             <section className={PANEL}>
               <h3 className="mb-3 text-[15px] font-bold">{relatedLabel}</h3>
-              <div className="flex flex-col gap-2">
-                {relatedMatches.map((m, i) => (
-                  <MatchRow
-                    key={`${m.matchId}-${i}`}
-                    match={m}
-                    onClick={() => router.push(`/watch/${m.matchId}?sport=${m.sportType ?? sportType}`)}
+              <div className="flex flex-col gap-4">
+                {groupMatchesByLeague(relatedMatches).map((lg) => (
+                  <LeagueGroupSection
+                    key={lg.key}
+                    group={lg}
+                    onMatchClick={(m) => router.push(`/watch/${m.matchId}?sport=${m.sportType ?? sportType}`)}
                   />
                 ))}
               </div>

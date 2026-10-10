@@ -2,8 +2,9 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, RefreshCw, Inbox, type LucideIcon } from 'lucide-react';
-import { MatchRow, MatchRowSkeleton } from '@/components/Match';
+import { Loader2, RefreshCw, Inbox, ChevronDown, type LucideIcon } from 'lucide-react';
+import { MatchRowSkeleton } from '@/components/Match';
+import { groupMatchesByLeague, LeagueGroupSection } from '@/components/LeagueGroup';
 import { isLiveStatus, matchDateMs } from '@/lib/matchProto';
 import { useSportMatches } from '@/lib/queries';
 import { sportLabel, sportIcon } from '@/lib/sports';
@@ -16,6 +17,48 @@ interface MatchGroup {
   icon: LucideIcon;
   isLive: boolean;
   items: Match[];
+}
+
+/** Render one sport group on the home feed. Matches are split into per-league
+ *  sub-sections so the league name shows once per header, not per card.
+ *  The sport header is a toggle — collapsed groups show only the header row. */
+function SportGroupSection({
+  group,
+  onMatchClick,
+  defaultOpen = true,
+}: {
+  group: MatchGroup;
+  onMatchClick: (m: Match) => void;
+  defaultOpen?: boolean;
+}) {
+  const leagueGroups = useMemo(() => groupMatchesByLeague(group.items), [group.items]);
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="mb-[22px]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="mb-2.5 flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-border-soft/60"
+      >
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]">
+          <group.icon className="h-[15px] w-[15px]" />
+          {group.label}
+          <span className="rounded-full border border-border bg-panel px-2 py-px text-[11px] font-bold text-muted">{group.items.length}</span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted transition-transform duration-200 ${open ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-4">
+          {leagueGroups.map((lg) => (
+            <LeagueGroupSection key={lg.key} group={lg} onMatchClick={onMatchClick} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function MatchListContent() {
@@ -147,24 +190,10 @@ function MatchListContent() {
 
       {groups.map((g, idx) => (
         <Fragment key={g.key}>
-          <section className="mb-[22px]">
-            <header className="mb-2.5 flex items-center justify-between">
-              <span className={g.isLive ? 'inline-flex items-center gap-2 text-sm font-bold text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]' : 'inline-flex items-center gap-2 text-sm font-bold text-text'}>
-                <g.icon className="h-[15px] w-[15px]" />
-                {g.label}
-                <span className="rounded-full border border-border bg-panel px-2 py-px text-[11px] font-bold text-muted">{g.items.length}</span>
-              </span>
-            </header>
-            <div className="flex flex-col gap-2">
-              {g.items.map((m, i) => (
-                <MatchRow
-                  key={`${m.matchId}-${i}`}
-                  match={m}
-                  onClick={() => router.push(`/watch/${m.matchId}?sport=${m.sportType ?? 0}`)}
-                />
-              ))}
-            </div>
-          </section>
+          <SportGroupSection
+            group={g}
+            onMatchClick={(m) => router.push(`/watch/${m.matchId}?sport=${m.sportType ?? 0}`)}
+          />
 
           {/* In-feed banner — between the first group and the rest. */}
           {idx === 0 && groups.length > 1 && (

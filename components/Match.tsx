@@ -233,17 +233,19 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
             {/* League row lives OUTSIDE the team grid (full-width, centred) so
                 its text length never changes the centre-column width — the team
                 logo/name positions stay fixed. Only the score sets the centre
-                width (with a min-width so "VS" / short scores align too). */}
+                width (with a min-width so "VS" / short scores align too).
+                Always shown so each card stays self-explanatory even when the
+                league group header is scrolled off-screen. */}
             <span className="mb-2 flex items-center justify-center gap-1 text-[11px] leading-tight text-muted">
-              {match.hot && <Flame className="h-3.5 w-3.5 shrink-0 text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]" />}
-              <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
-              <span className="min-w-0 max-w-[260px] truncate">{sportName}{' · '}{league}</span>
-              {live && (
-                <span className={LIVE_LABEL}>
-                  <span className="h-1 w-1 rounded-full bg-current animate-[blink_1.2s_infinite]" />
-                  Live
-                </span>
-              )}
+                {match.hot && <Flame className="h-3.5 w-3.5 shrink-0 text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]" />}
+                <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
+                <span className="min-w-0 max-w-[260px] truncate">{sportName}{' · '}{league}</span>
+                {live && (
+                  <span className={LIVE_LABEL}>
+                    <span className="h-1 w-1 rounded-full bg-current animate-[blink_1.2s_infinite]" />
+                    Live
+                  </span>
+                )}
             </span>
             <span className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5">
               <span className="flex min-w-0 justify-end">
