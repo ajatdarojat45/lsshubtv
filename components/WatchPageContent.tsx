@@ -6,16 +6,18 @@ import Link from 'next/link';
 import { Loader2, RefreshCw, Share2, ThumbsUp, X } from 'lucide-react';
 import { useRB } from '@/components/RBProvider';
 import { MatchRow, StatusBadge } from '@/components/Match';
-import { isLiveStatus, matchDateMs } from '@/lib/matchProto';
+import { isLiveStatus, matchDateMs, isPlayable } from '@/lib/matchProto';
 import { useSportMatches, useMatchDetail, useStreamUrl } from '@/lib/queries';
 import { sportSlug, sportLabel } from '@/lib/sports';
 import VideoPlayer from '@/components/VideoPlayer';
 import AdBanner from '@/components/AdBanner';
-import type { Match } from '@/lib/types';
+import type { Match, Stream } from '@/lib/types';
 
 interface ResolvedStream {
+  key: number;
   url: string;
   referer: string;
+  label: string;
 }
 
 export function WatchPageContent({ id }: { id: string }) {
@@ -29,7 +31,7 @@ export function WatchPageContent({ id }: { id: string }) {
   const [liked, setLiked] = useState(false);
   const [playing, setPlaying] = useState<ResolvedStream | null>(null);
   const [resolveErr, setResolveErr] = useState('');
-  const resolvedRef = useRef(false);
+  const autoPlayedRef = useRef(false);
 
   const sportParam = Number(searchParams.get('sport'));
   const preferredSport =
@@ -53,28 +55,37 @@ export function WatchPageContent({ id }: { id: string }) {
   const match = detail?.match ?? listMatch ?? null;
   const streams = detail?.streams ?? detail?.channels ?? [];
 
-  // Auto-resolve the first playable stream.
-  useEffect(() => {
-    if (resolvedRef.current || !streams.length) return;
-    const s = streams.find((st) => st.url) ?? streams[0];
-    if (!s) return;
-    resolvedRef.current = true;
-    streamMutation
-      .mutateAsync({
+  const streamLabel = (s: Stream, i: number): string =>
+    s.fullName || s.name || `Channel #${s.streamId ?? s.channelId ?? i + 1}`;
+
+  const playChannel = async (s: Stream, i: number): Promise<void> => {
+    setResolveErr('');
+    try {
+      const res = await streamMutation.mutateAsync({
         matchId,
         streamId: s.streamId ?? 0,
         sportType,
         siteType: s.siteType ?? cfg.siteType,
         continent: cfg.continent,
         country: cfg.country,
-      })
-      .then((res) => {
-        setPlaying({ url: res.url, referer: res.referer });
-        // Pause immediately on load so the pause-ad overlay shows first.
-        setPaused(true);
-      })
-      .catch(() => setResolveErr('Could not resolve stream URL.'));
-  }, [streams, streamMutation, matchId, sportType, cfg.siteType, cfg.continent, cfg.country]);
+      });
+      setPlaying({ key: i, url: res.url, referer: res.referer, label: streamLabel(s, i) });
+      // Pause on (auto)select so the pause-ad overlay shows first.
+      setPaused(true);
+    } catch (e) {
+      setResolveErr(e instanceof Error ? e.message : 'Could not resolve stream URL.');
+    }
+  };
+
+  // Auto-pick the first playable channel once streams are ready.
+  useEffect(() => {
+    if (autoPlayedRef.current || !streams.length) return;
+    autoPlayedRef.current = true;
+    const idx = streams.findIndex((s) => isPlayable(s));
+    const pick = idx >= 0 ? idx : 0;
+    void playChannel(streams[pick], pick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streams]);
 
   // Related matches — live first (priority), then upcoming (soonest first).
   const relatedMatches = (matchesQuery.data?.list ?? [])
@@ -112,7 +123,7 @@ export function WatchPageContent({ id }: { id: string }) {
   }, [title]);
 
   const handleRefresh = (): void => {
-    resolvedRef.current = false;
+    autoPlayedRef.current = false;
     setPlaying(null);
     setResolveErr('');
     void Promise.all([detailQuery.refetch(), matchesQuery.refetch()]);
@@ -165,6 +176,24 @@ export function WatchPageContent({ id }: { id: string }) {
               ) : (
                 <div className="video-player" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span className="spinner"><Loader2 className="spin" size={20} /> Preparing stream…</span>
+                </div>
+              )}
+
+              {streams.length > 0 && (
+                <div className="channel-overlay">
+                  {streams.map((s, i) => {
+                    const active = playing?.key === i;
+                    return (
+                      <button
+                        type="button"
+                        key={i}
+                        className={`channel-item ${active ? 'active' : ''}`}
+                        onClick={() => void playChannel(s, i)}
+                      >
+                        {streamLabel(s, i)}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
