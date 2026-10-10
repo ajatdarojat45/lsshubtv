@@ -4,7 +4,7 @@ import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
-export type AdBannerSize = 'leaderboard' | 'rectangle' | 'mobile-banner';
+export type AdBannerSize = 'leaderboard' | 'rectangle' | 'mobile-banner' | 'skyscraper';
 
 /** Reserved height per size — reserves the space up front to prevent CLS
  *  (equivalent to Tailwind `min-h-[90px]` / `min-h-[250px]`). */
@@ -12,6 +12,7 @@ const MIN_HEIGHTS: Record<AdBannerSize, number> = {
   leaderboard: 90, // 728x90 / responsive leaderboard
   rectangle: 250, // 300x250 medium rectangle
   'mobile-banner': 60, // 320x50 mobile banner
+  skyscraper: 600, // 160x600 skyscraper
 };
 
 export interface AdBannerProps {

@@ -9,6 +9,7 @@ import { RBProvider } from '@/components/RBProvider';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FooterCategories } from '@/components/FooterCategories';
 import { SportNav } from '@/components/SportNav';
+import { LazyGutterAd } from '@/components/LazyGutterAd';
 import { required } from '@/lib/env';
 
 const contactEmail = required(process.env.RB_CONTACT_EMAIL, 'RB_CONTACT_EMAIL');
@@ -25,21 +26,35 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <QueryProvider>
           <RBProvider>
             <div className="app">
-              <header className="app-header">
-                <div className="brand">
-                  <span className="brand-mark"><Trophy size={22} /></span>
-                  <div className="brand-text">
-                    <h1>LSSHubTV</h1>
-                    <p>Live Sports Streaming</p>
+              <div className="app-body">
+                <aside className="gutter gutter-left" aria-label="Advertisement">
+                  <div className="gutter-sticky">
+                    <LazyGutterAd slotId="gutter-left" />
                   </div>
+                </aside>
+                <div className="app-main">
+                  <header className="app-header">
+                    <div className="brand">
+                      <span className="brand-mark"><Trophy size={22} /></span>
+                      <div className="brand-text">
+                        <h1>LSSHubTV</h1>
+                        <p>Live Sports Streaming</p>
+                      </div>
+                    </div>
+                    <div className="header-actions">
+                      <ThemeToggle />
+                      <span className="live-chip"><span className="dot" />LIVE</span>
+                    </div>
+                  </header>
+                  <SportNav />
+                  <main className="app-content">{children}</main>
                 </div>
-                <div className="header-actions">
-                  <ThemeToggle />
-                  <span className="live-chip"><span className="dot" />LIVE</span>
-                </div>
-              </header>
-              <SportNav />
-              <main className="app-main">{children}</main>
+                <aside className="gutter gutter-right" aria-label="Advertisement">
+                  <div className="gutter-sticky">
+                    <LazyGutterAd slotId="gutter-right" />
+                  </div>
+                </aside>
+              </div>
               <footer className="app-footer">
                 <div className="footer-grid">
                   <div className="footer-col">
