@@ -1,7 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import type { ReactNode } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  RectangleVertical,
+  Star,
+  Volleyball,
+} from 'lucide-react';
 import type { MatchLineup, Team, LineupPlayer } from '@/lib/types';
 import { positionLabel, type PlayerEventStats } from '@/lib/matchProto';
 import { playerAvatarUrl } from '@/lib/logos';
@@ -33,26 +41,31 @@ function splitLineup(list: LineupPlayer[]): { starters: LineupPlayer[]; subs: Li
   };
 }
 
-/** Compact event badges for one player: ⚽ goal(s), assist, cards, sub arrows. */
+/** Compact event badges for one player: goal(s), assist, cards, sub arrows.
+ *  All glyphs are Lucide icons (no emoji) so they match the timeline tab and
+ *  render consistently across platforms. */
 function EventBadges({ stats }: { stats?: PlayerEventStats }) {
   if (!stats) return null;
   const { goals, assists, yellow, red, subIn, subOut } = stats;
-  const chip = (key: string, text: string, cls: string) => (
+  const chip = (key: string, cls: string, label: string, icon?: ReactNode) => (
     <span
       key={key}
+      title={label}
+      aria-label={label}
       className={`inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-px text-[10px] font-bold leading-tight ${cls}`}
     >
-      {text}
+      {icon}
+      {label && <span>{label}</span>}
     </span>
   );
   return (
     <span className="flex shrink-0 items-center gap-1">
-      {goals > 0 && chip('g', `⚽ ${goals > 1 ? goals : ''}`, 'text-[#16a34a]')}
-      {assists > 0 && chip('a', `${assists > 1 ? `${assists} ` : ''}AST`, 'text-accent')}
-      {subIn && chip('in', '↑', 'text-[#16a34a]')}
-      {subOut && chip('out', '↓', 'text-[#dc2626]')}
-      {yellow > 0 && chip('y', '🟨', '')}
-      {red > 0 && chip('r', '🟥', '')}
+      {goals > 0 && chip('g', 'text-[#16a34a]', goals > 1 ? String(goals) : '', <Volleyball size={11} />)}
+      {assists > 0 && chip('a', 'text-accent', `AST${assists > 1 ? ` ${assists}` : ''}`, <Star size={11} />)}
+      {subIn && chip('in', 'text-[#16a34a]', '', <ArrowUp size={12} />)}
+      {subOut && chip('out', 'text-[#dc2626]', '', <ArrowDown size={12} />)}
+      {yellow > 0 && chip('y', 'text-[#eab308]', yellow > 1 ? String(yellow) : '', <RectangleVertical size={11} fill="currentColor" />)}
+      {red > 0 && chip('r', 'text-[#dc2626]', red > 1 ? String(red) : '', <RectangleVertical size={11} fill="currentColor" />)}
     </span>
   );
 }

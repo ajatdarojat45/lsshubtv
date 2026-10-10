@@ -1,8 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  CircleDot,
+  Flag,
+  RectangleVertical,
+  Repeat,
+  Volleyball,
+  X,
+  type LucideProps,
+} from 'lucide-react';
 import type { MatchEvent, MatchEvents, Team } from '@/lib/types';
 import { eventMinute, eventTypeLabel } from '@/lib/matchProto';
 import { playerAvatarUrl } from '@/lib/logos';
@@ -58,29 +69,32 @@ function minuteValue(e: MatchEvent): number {
   return n + x * 0.1;
 }
 
-/** Icon + accent text colour + spine dot colour for an event type. */
-function eventMeta(code: number): { icon: string; cls: string; dot: string } {
+/** Icon + accent text colour + spine dot colour for an event type. All event
+ *  glyphs are Lucide icons (no emoji) so they match the rest of the UI and
+ *  render consistently across platforms. */
+type EventIcon = ComponentType<LucideProps>;
+function eventMeta(code: number): { Icon: EventIcon; cls: string; dot: string; filled?: boolean } {
   switch (code) {
     case 101:
     case 103:
     case 10020:
-      return { icon: '⚽', cls: 'text-[#16a34a]', dot: 'bg-[#16a34a]' };
+      return { Icon: Volleyball, cls: 'text-[#16a34a]', dot: 'bg-[#16a34a]' };
     case 102:
-      return { icon: '⚽', cls: 'text-[#dc2626]', dot: 'bg-[#dc2626]' };
+      return { Icon: Volleyball, cls: 'text-[#dc2626]', dot: 'bg-[#dc2626]' };
     case 104:
     case 10021:
-      return { icon: '✖', cls: 'text-muted', dot: 'bg-[#9ca3af]' };
+      return { Icon: X, cls: 'text-muted', dot: 'bg-[#9ca3af]' };
     case 106:
-      return { icon: '🟨', cls: '', dot: 'bg-[#eab308]' };
+      return { Icon: RectangleVertical, cls: 'text-[#eab308]', dot: 'bg-[#eab308]', filled: true };
     case 107:
     case 108:
-      return { icon: '🟥', cls: '', dot: 'bg-[#dc2626]' };
+      return { Icon: RectangleVertical, cls: 'text-[#dc2626]', dot: 'bg-[#dc2626]', filled: true };
     case 105:
-      return { icon: '🔄', cls: 'text-accent', dot: 'bg-accent' };
+      return { Icon: Repeat, cls: 'text-accent', dot: 'bg-accent' };
     case 109:
-      return { icon: '🚩', cls: 'text-muted', dot: 'bg-[#9ca3af]' };
+      return { Icon: Flag, cls: 'text-muted', dot: 'bg-[#9ca3af]' };
     default:
-      return { icon: '•', cls: 'text-muted', dot: 'bg-[#9ca3af]' };
+      return { Icon: CircleDot, cls: 'text-muted', dot: 'bg-[#9ca3af]' };
   }
 }
 
@@ -122,8 +136,9 @@ function subLine(e: MatchEvent): ReactNode {
     return <span className="w-full truncate text-[11px] leading-tight text-muted">own goal</span>;
   if (e.eventType === 105 && e.substitutionOut?.name)
     return (
-      <span className="w-full truncate text-[11px] leading-tight text-muted">
-        <span className="text-[#dc2626]">↓</span> {e.substitutionOut.name}
+      <span className="inline-flex w-full items-center gap-1 truncate text-[11px] leading-tight text-muted">
+        <ArrowDown size={11} className="shrink-0 text-[#dc2626]" />
+        {e.substitutionOut.name}
       </span>
     );
   if (e.description)
@@ -140,13 +155,14 @@ function EventRow({
   side: 'home' | 'away';
   sportType?: number;
 }) {
-  const { icon, cls, dot } = eventMeta(e.eventType);
+  const { Icon, cls, dot, filled } = eventMeta(e.eventType);
   const away = side === 'away';
   const player = e.scorer ?? e.offender ?? e.substitutionIn;
   const main =
     e.eventType === 105 ? (
-      <span className="w-full truncate text-[13px] font-semibold leading-tight">
-        <span className="text-[#16a34a]">↑</span> {e.substitutionIn?.name ?? 'Substitution'}
+      <span className="inline-flex w-full items-center gap-1 truncate text-[13px] font-semibold leading-tight">
+        <ArrowUp size={13} className="shrink-0 text-[#16a34a]" />
+        {e.substitutionIn?.name ?? 'Substitution'}
       </span>
     ) : (
       <span className="w-full truncate text-[13px] font-semibold leading-tight">
@@ -159,7 +175,7 @@ function EventRow({
         away ? 'flex-row-reverse text-right' : ''
       }`}
     >
-      <span className={`shrink-0 text-[15px] leading-none ${cls}`}>{icon}</span>
+      <Icon size={16} strokeWidth={2.25} fill={filled ? 'currentColor' : 'none'} className={`shrink-0 ${cls}`} />
       <Avatar name={player?.name} logo={player?.logo} sportType={sportType} />
       <span className={`flex min-w-0 flex-1 flex-col ${away ? 'items-end' : 'items-start'}`}>
         {main}
