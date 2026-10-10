@@ -140,14 +140,23 @@ export function WatchPageContent({ id }: { id: string }) {
   //   3 · upcoming + same category
   //   4 · finished (last resort — rarely present on the live list)
   // Ties break by soonest kickoff (live → most mature first; upcoming → next up).
+  // League identity falls back to the (case-insensitive) league name because
+  // some payloads omit leagueId while still carrying the league name.
   const leagueId = match?.league?.leagueId;
+  const leagueName = match?.league?.name?.trim().toLowerCase();
+  const sameLeague = (m: Match): boolean => {
+    if (leagueId !== undefined && m.league?.leagueId !== undefined)
+      return m.league.leagueId === leagueId;
+    const other = m.league?.name?.trim().toLowerCase();
+    return !!leagueName && !!other && other === leagueName;
+  };
   const others = (matchesQuery.data?.list ?? []).filter(
     (m) => String(m.matchId) !== String(matchId)
   );
   const relevance = (m: Match): number => {
-    const sameLeague = leagueId !== undefined && m.league?.leagueId === leagueId;
-    if (isLiveStatus(m.status)) return sameLeague ? 0 : 1;
-    if (!isStarted(m.status)) return sameLeague ? 2 : 3; // not live & not finished = upcoming
+    const same = sameLeague(m);
+    if (isLiveStatus(m.status)) return same ? 0 : 1;
+    if (!isStarted(m.status)) return same ? 2 : 3; // not live & not finished = upcoming
     return 4; // finished
   };
   const bySoonest = (a: Match, b: Match): number =>
@@ -158,7 +167,14 @@ export function WatchPageContent({ id }: { id: string }) {
     .slice(0, 6);
 
   // Heading reflects the TOP tier actually present, so the context is explicit.
+  // Tier 0/2 mean every shown match is from this competition — filter the list
+  // down to same-league matches so the heading never lies (the bug: heading
+  // said "this competition" while the sliced list mixed in other leagues).
   const topTier = relatedMatches.length ? relevance(relatedMatches[0]) : 4;
+  const sameCompetitionOnly = topTier === 0 || topTier === 2;
+  const visibleRelated = sameCompetitionOnly
+    ? relatedMatches.filter((m) => sameLeague(m))
+    : relatedMatches;
   const relatedLabel =
     topTier === 0
       ? 'Live in this competition'
@@ -360,12 +376,14 @@ export function WatchPageContent({ id }: { id: string }) {
           {/* Big ad — above the related matches */}
           <AdBanner slotId="watch-above-related" category={slug} size="rectangle" />
 
-          {/* Related matches (live/upcoming) — grouped by league name */}
-          {relatedMatches.length > 0 && (
+          {/* Related matches (live/upcoming) — grouped by league name.
+              `visibleRelated` is already filtered to this competition when the
+              heading says so, so other leagues can never leak in. */}
+          {visibleRelated.length > 0 && (
             <section className={PANEL}>
               <h3 className="mb-3 text-[15px] font-bold">{relatedLabel}</h3>
               <div className="flex flex-col gap-4">
-                {groupMatchesByLeague(relatedMatches).map((lg) => (
+                {groupMatchesByLeague(visibleRelated).map((lg) => (
                   <LeagueGroupSection
                     key={lg.key}
                     group={lg}
