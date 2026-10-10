@@ -24,6 +24,22 @@ const MATCH_GROUPS = [
   { key: 'finished', label: 'Finished', icon: CircleCheck },
 ] as const;
 
+/* Filter-tab pills (`.filter-tab` / `.filter-count`). Active state is a
+ * separate string so its color utilities don't fight the idle ones. */
+const FILTER_TAB =
+  'inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-all';
+const FILTER_TAB_IDLE = `${FILTER_TAB} border-border bg-panel text-muted hover:border-[#c7ccd2] hover:text-text`;
+const FILTER_TAB_ACTIVE = `${FILTER_TAB} border-accent bg-accent-soft text-accent`;
+
+const FILTER_COUNT = 'min-w-5 rounded-full px-2 py-px text-center text-[11px] font-bold';
+const FILTER_COUNT_IDLE = `${FILTER_COUNT} bg-[#f1f3f4] text-muted [[data-theme=dark]_&]:bg-border-soft`;
+const FILTER_COUNT_ACTIVE = `${FILTER_COUNT} bg-[rgba(26,115,232,0.2)] text-accent`;
+
+/* Group heading (`.group-title` / `.group-title.is-live`). */
+const GROUP_TITLE = 'inline-flex items-center gap-2 text-sm font-bold text-text';
+const GROUP_TITLE_LIVE =
+  'inline-flex items-center gap-2 text-sm font-bold text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]';
+
 type FilterKey = (typeof FILTER_TABS)[number]['key'];
 type Category = 'live' | 'upcoming' | 'finished';
 
@@ -138,81 +154,85 @@ export function SportCategoryMatches({ sportType, category, label }: SportCatego
       {/* Top banner — before the title/content. */}
       <AdBanner slotId="sports-category-top" category={category} size="leaderboard" />
 
-      <div className="back-bar">
-        <Link href="/" className="btn-back">← All sports</Link>
-        <div className="back-bar-actions">
-          <span className="muted mono">{label}</span>
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+        <Link href="/" className="inline-flex items-center gap-1 text-sm font-semibold text-accent no-underline hover:underline">← All sports</Link>
+        <div className="inline-flex items-center gap-3">
+          <span className="font-mono text-xs text-muted">{label}</span>
           <button
             type="button"
-            className="refresh-btn"
+            className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-[var(--radius-sm)] border border-border bg-panel text-base text-muted transition-all hover:border-[#c7ccd2] hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => void matchesQuery.refetch()}
             disabled={matchesQuery.isFetching}
             title="Refresh"
           >
-            {matchesQuery.isFetching ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+            {matchesQuery.isFetching ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
           </button>
         </div>
       </div>
 
-      <section className="search-bar">
+      <section className="mb-[18px] flex items-center gap-3">
         <input
-          className="search-input"
+          className="flex-1 rounded-xl border border-border bg-panel px-4 py-[11px] text-sm text-text transition-[border-color,box-shadow] placeholder:text-muted focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none"
           type="search"
           placeholder="Search teams, leagues, or matches…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         {matches && (
-          <span className="stats">
-            <span className="stat"><strong>{list.length}</strong> matches</span>
-            <span className="stat live"><span className="dot" />{liveCount} live</span>
+          <span className="flex gap-2.5 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-panel px-3.5 py-1.5 text-[13px] text-muted [&_strong]:text-text"><strong>{list.length}</strong> matches</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(239,68,68,0.4)] bg-live-soft px-3.5 py-1.5 text-[13px] text-[#d93025]"><span className="h-[7px] w-[7px] shrink-0 rounded-full bg-current" />{liveCount} live</span>
           </span>
         )}
       </section>
 
-      <section className="filter-tabs" role="tablist">
+      <section className="mb-4 flex flex-wrap gap-2" role="tablist">
         {FILTER_TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             role="tab"
             aria-selected={tab === t.key}
-            className={`filter-tab ${tab === t.key ? 'active' : ''}`}
+            className={tab === t.key ? FILTER_TAB_ACTIVE : FILTER_TAB_IDLE}
             onClick={() => setTab(t.key)}
           >
             {t.label}
-            <span className="filter-count">{counts[t.key]}</span>
+            <span className={tab === t.key ? FILTER_COUNT_ACTIVE : FILTER_COUNT_IDLE}>{counts[t.key]}</span>
           </button>
         ))}
       </section>
 
-      {err && <div className="error-banner">{err}</div>}
+      {err && (
+        <div className="mb-4 rounded-xl border border-[rgba(239,68,68,0.45)] bg-[rgba(239,68,68,0.12)] px-4 py-3 text-[13px] whitespace-pre-wrap break-words text-[#c5221f] [[data-theme=dark]_&]:border-[#ef4444] [[data-theme=dark]_&]:bg-[rgba(255,255,255,0.08)] [[data-theme=dark]_&]:text-[#fca5a5]">
+          {err}
+        </div>
+      )}
 
       {busy && !matches && (
-        <div className="match-list">
+        <div className="flex flex-col gap-2">
           {Array.from({ length: 6 }).map((_, i) => <MatchRowSkeleton key={i} />)}
         </div>
       )}
 
       {!busy && matches && visible.length === 0 && (
-        <section className="panel empty-state">
-          <Inbox className="empty-icon" />
-          <h2>{emptyTitle}</h2>
-          <p className="muted">{emptyDesc}</p>
+        <section className="mb-4 rounded border border-border bg-panel px-5 py-10 text-center max-[640px]:px-4 max-[640px]:py-8">
+          <Inbox className="h-9 w-9" />
+          <h2 className="mt-2 mb-1.5 text-[19px]">{emptyTitle}</h2>
+          <p className="mb-3.5 text-sm leading-[1.65] text-muted">{emptyDesc}</p>
         </section>
       )}
 
       {groups.map((g, idx) => (
         <Fragment key={g.key}>
-          <section className="match-group">
-            <header className="group-head">
-              <span className={`group-title ${g.isLive ? 'is-live' : ''}`}>
-                <g.icon className="group-icon" />
+          <section className="mb-[22px]">
+            <header className="mb-2.5 flex items-center justify-between">
+              <span className={g.isLive ? GROUP_TITLE_LIVE : GROUP_TITLE}>
+                <g.icon className="h-[15px] w-[15px]" />
                 {g.label}
-                <span className="group-count">{g.items.length}</span>
+                <span className="rounded-full border border-border bg-panel px-2 py-px text-[11px] font-bold text-muted">{g.items.length}</span>
               </span>
             </header>
-            <div className="match-list">
+            <div className="flex flex-col gap-2">
               {g.items.map((m, i) => (
                 <MatchRow
                   key={`${m.matchId}-${i}`}

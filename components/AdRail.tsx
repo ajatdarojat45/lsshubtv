@@ -1,6 +1,9 @@
 export function AdRail() {
   return (
-    <aside className="ad-rail" aria-label="Advertisement">
+    <aside
+      className="relative mb-4 flex w-full items-center justify-center overflow-hidden border border-border-soft bg-panel"
+      aria-label="Advertisement"
+    >
       {/*
         ============================================================
         IKLAN KIRI (rail) — tempel tag jaringan iklan Anda di sini.
@@ -23,9 +26,11 @@ export function AdRail() {
           <div id="container-XXXXXXXXXX" /> + tag <script> Adsterra-nya
         ============================================================
       */}
-      <div className="ad-slot">
-        <span className="ad-label">Advertisement</span>
-        <div className="ad-slot-placeholder">Iklan</div>
+      <div className="flex w-full flex-col items-center justify-center">
+        <span className="absolute left-2.5 top-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted opacity-65">
+          Advertisement
+        </span>
+        <div className="flex h-[600px] w-full items-center justify-center text-sm text-muted">Iklan</div>
       </div>
     </aside>
   );

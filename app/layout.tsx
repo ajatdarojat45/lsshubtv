@@ -15,7 +15,7 @@ import { required } from '@/lib/env';
 const contactEmail = required(process.env.RB_CONTACT_EMAIL, 'RB_CONTACT_EMAIL');
 
 export const metadata: Metadata = {
-  title: 'LSSHubTV — Live Sports',
+  title: 'LSSHubTv — Live Sports',
   description: 'Live sports streaming',
 };
 
@@ -25,60 +25,62 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <QueryProvider>
           <RBProvider>
-            <div className="app">
-              <div className="app-body">
-                <aside className="gutter gutter-left" aria-label="Advertisement">
-                  <div className="gutter-sticky">
+            <div className="mx-auto max-w-[1000px] px-4 pb-16 min-[1025px]:max-w-[calc(60%_+_400px)] max-[640px]:px-3 max-[640px]:pb-12">
+              <div className="flex gap-5">
+                <aside className="hidden w-40 min-w-0 shrink-0 basis-40 min-[768px]:block" aria-label="Advertisement">
+                  <div className="sticky top-5">
                     <LazyGutterAd slotId="gutter-left" />
                   </div>
                 </aside>
-                <div className="app-main">
-                  <header className="app-header">
-                    <div className="brand">
-                      <span className="brand-mark"><Trophy size={22} /></span>
-                      <div className="brand-text">
-                        <h1>LSSHubTV</h1>
-                        <p>Live Sports Streaming</p>
+                <div className="min-h-[60vh] min-w-0 flex-1">
+                  <header className="sticky top-0 z-20 mb-5 flex items-center justify-between bg-[rgba(248,249,250,0.72)] py-3 shadow-[0_1px_0_rgba(255,255,255,0.65)_inset,0_10px_30px_-18px_rgba(15,23,42,0.35)] backdrop-blur-[14px] backdrop-saturate-150 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:content-[''] after:bg-[linear-gradient(90deg,transparent,var(--accent),transparent)] max-[640px]:mb-4 max-[640px]:py-2.5 [[data-theme=dark]_&]:bg-[rgba(10,14,21,0.72)] [[data-theme=dark]_&]:shadow-[0_10px_30px_-18px_rgba(0,0,0,0.8)]">
+                    <div className="flex items-center gap-3 max-[640px]:gap-2.5">
+                      <span className="inline-flex h-[42px] w-[42px] items-center justify-center rounded ring-1 ring-inset ring-[rgba(255,255,255,0.28)] [background:var(--grad)] text-[22px] shadow-[0_8px_20px_-6px_rgba(26,115,232,0.55)] max-[640px]:h-9 max-[640px]:w-9 max-[640px]:rounded-[10px] max-[640px]:text-[18px] max-[640px]:[&>svg]:h-[18px] max-[640px]:[&>svg]:w-[18px]"><Trophy size={22} /></span>
+                      <div>
+                        <h1 className="m-0 text-[19px] leading-[1.1] tracking-[-0.02em] max-[640px]:text-[16px]">LSSHubTv</h1>
+                        <p className="mt-0.5 text-[12px] text-muted max-[640px]:text-[11px]">Live Sports Streaming</p>
                       </div>
                     </div>
-                    <div className="header-actions">
+                    <div className="inline-flex items-center gap-2">
                       <ThemeToggle />
-                      <span className="live-chip"><span className="dot" />LIVE</span>
+                      <span className="inline-flex items-center gap-[7px] rounded-full border border-[rgba(239,68,68,0.4)] bg-live-soft px-3.5 py-[7px] text-xs font-bold tracking-[0.08em] text-[#d93025] max-[640px]:px-[11px] max-[640px]:py-1.5 max-[640px]:text-[11px] [[data-theme=dark]_&]:border-[rgba(239,68,68,0.5)] [[data-theme=dark]_&]:text-[#fca5a5]"><span className="h-[7px] w-[7px] shrink-0 rounded-full bg-current" />LIVE</span>
                     </div>
                   </header>
                   <SportNav />
-                  <main className="app-content">{children}</main>
-                  <footer className="app-footer">
-                    <div className="footer-grid">
-                      <div className="footer-col">
-                        <h3 className="footer-title">Categories</h3>
+                  <main>{children}</main>
+                  <footer className="mt-10 border-t border-border-soft pt-[18px] text-center text-xs text-muted">
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-6 pb-[18px] max-[640px]:grid-cols-[1fr] max-[640px]:gap-[18px] max-[640px]:pb-3.5">
+                      <div className="min-w-0 text-left">
+                        <h3 className="mb-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-text">Categories</h3>
                         <FooterCategories />
                       </div>
-                      <div className="footer-col">
-                        <h3 className="footer-title">Contact Us</h3>
-                        <ul className="footer-links">
+                      <div className="min-w-0 text-center max-[640px]:text-left">
+                        <h3 className="mb-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-text">Contact Us</h3>
+                        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px]">
                           <li>
-                            <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
+                            <a href={`mailto:${contactEmail}`} className="text-muted no-underline transition-colors duration-150 hover:text-accent hover:underline">
+                              {contactEmail}
+                            </a>
                           </li>
                         </ul>
                       </div>
-                      <div className="footer-col">
-                        <h3 className="footer-title">Terms</h3>
-                        <ul className="footer-links">
+                      <div className="min-w-0 text-right max-[640px]:text-left">
+                        <h3 className="mb-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-text">Terms</h3>
+                        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px]">
                           <li>
-                            <Link href="/privacy">Privacy Policy</Link>
+                            <Link href="/privacy" className="text-muted no-underline transition-colors duration-150 hover:text-accent hover:underline">Privacy Policy</Link>
                           </li>
                           <li>
-                            <Link href="/terms">Terms of Service</Link>
+                            <Link href="/terms" className="text-muted no-underline transition-colors duration-150 hover:text-accent hover:underline">Terms of Service</Link>
                           </li>
                         </ul>
                       </div>
                     </div>
-                    <p>LSSHubTV 3.0.323 · Streaming via local proxy</p>
+                    <p>LSSHubTv 3.0.323 · Streaming via local proxy</p>
                   </footer>
                 </div>
-                <aside className="gutter gutter-right" aria-label="Advertisement">
-                  <div className="gutter-sticky">
+                <aside className="hidden w-40 min-w-0 shrink-0 basis-40 min-[768px]:block" aria-label="Advertisement">
+                  <div className="sticky top-5">
                     <LazyGutterAd slotId="gutter-right" />
                   </div>
                 </aside>

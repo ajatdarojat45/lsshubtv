@@ -110,13 +110,15 @@ export default function AdBanner({
   return (
     <>
       <div
-        className={`ad-banner ${className ?? ''}`}
+        className={`relative mb-4 flex w-full items-center justify-center overflow-hidden rounded-sm border border-border-soft bg-panel ${className ?? ''}`}
         style={{ minHeight: MIN_HEIGHTS[size] }}
         role="complementary"
         aria-label="Advertisement"
       >
-        <span className="ad-banner-label">Advertisement</span>
-        <div ref={slotRef} className="ad-banner-slot" />
+        <span className="absolute left-2.5 top-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted opacity-[0.65]">
+          Advertisement
+        </span>
+        <div ref={slotRef} className="flex w-full items-center justify-center" />
       </div>
       {scriptSrc ? <Script src={scriptSrc} strategy={strategy} /> : null}
     </>

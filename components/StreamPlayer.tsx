@@ -73,9 +73,20 @@ export default function StreamPlayer({ url, referer, onError, onReady }: StreamP
   }, [src]);
 
   return (
-    <div className="player-wrap">
-      <video ref={videoRef} className="player" controls autoPlay muted playsInline />
-      {err && <pre className="error">{err}</pre>}
+    <div className="relative bg-black">
+      <video
+        ref={videoRef}
+        className="block max-h-[480px] w-full bg-black max-[1180px]:aspect-[16/9] max-[1180px]:h-auto"
+        controls
+        autoPlay
+        muted
+        playsInline
+      />
+      {err && (
+        <pre className="m-0 whitespace-pre-wrap break-words rounded-sm bg-[rgba(0,0,0,0.75)] px-2.5 py-2 font-mono text-xs text-[#ffb4b4]">
+          {err}
+        </pre>
+      )}
     </div>
   );
 }

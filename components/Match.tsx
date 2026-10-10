@@ -7,8 +7,113 @@ import { countryLogoUrl, teamLogoUrl } from '@/lib/logos';
 import { sportColor, sportIcon, sportLabel, sportIsScoring } from '@/lib/sports';
 import type { Match, MatchDetail, Stream, Team } from '@/lib/types';
 import StreamPlayer from './StreamPlayer';
+/* ------------------------------------------------------------------------- *
+ * Shared Tailwind class strings — replacements for the retired custom CSS
+ * component classes (see `@layer components` in app/globals.css).
+ * ------------------------------------------------------------------------- */
 
-export function TeamLogo({ path, name, sportType, kind = 'team' }: { path?: string; name?: string; sportType?: number; kind?: 'team' | 'league' }) {
+/** Logo box sizes: `.logo` was 22px/6px radius; contexts override it. */
+type LogoSize = 'base' | 'league' | 'rowTeam' | 'head' | 'detailTeam';
+const LOGO_SIZE: Record<LogoSize, string> = {
+  base: 'h-[22px] w-[22px] rounded-md text-[11px]',
+  league: 'h-4 w-4 rounded-[4px] text-[11px]',
+  rowTeam: 'h-6 w-6 rounded-md text-[11px]',
+  head: 'h-[34px] w-[34px] rounded-lg text-[15px]',
+  detailTeam:
+    'h-10 w-10 rounded-lg text-[16px] max-[640px]:h-8 max-[640px]:w-8 max-[640px]:text-[14px]',
+};
+/** `.logo` — the `<img>` variant. */
+const LOGO_IMG = 'shrink-0 object-contain';
+/** `.logo-empty` — the initial-letter placeholder variant. */
+const LOGO_EMPTY =
+  'inline-flex shrink-0 items-center justify-center bg-[#e8eaed] font-bold text-muted [[data-theme=dark]_&]:bg-border-soft';
+
+/** `.row-team-side` (+ `.row-team > span` / `.detail-team > span` ellipsis). */
+const TEAM_SIDE =
+  'inline-flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-ellipsis';
+/** `.row-team-member` */
+const TEAM_MEMBER = 'inline-flex min-w-0 items-center gap-1.5';
+/** `.row-team-name` */
+const TEAM_NAME = 'min-w-0 overflow-hidden whitespace-nowrap text-ellipsis';
+
+/** `.status` pill (shared base). */
+const STATUS =
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] py-1 text-[11px] font-semibold';
+/** `.status` — idle. */
+const STATUS_IDLE = `${STATUS} bg-[#f1f3f4] text-muted [[data-theme=dark]_&]:bg-[rgba(255,255,255,0.08)]`;
+/** `.status.status-live` */
+const STATUS_LIVE = `${STATUS} bg-[var(--live-soft)] text-[#d93025] [[data-theme=dark]_&]:bg-[rgba(255,255,255,0.08)] [[data-theme=dark]_&]:text-[#f87171]`;
+/** `.status-live .dot` (blinking live indicator) */
+const STATUS_DOT =
+  'h-[7px] w-[7px] shrink-0 rounded-full bg-current animate-[blink_1.2s_infinite]';
+
+/** `.match-row` base — responsive grid-areas stay in globals.css (unlayered). */
+const ROW_BASE =
+  'match-row grid w-full grid-cols-[120px_1fr_auto] items-center gap-2.5 rounded-xl border border-l-[3px] bg-card px-4 py-3 text-left transition-[border-color,transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow max-[1024px]:grid-cols-[110px_1fr_auto] max-[1024px]:px-3.5 max-[768px]:grid-cols-[1fr_auto] max-[768px]:gap-x-3 max-[768px]:gap-y-2';
+/** `.match-row` (upcoming/idle) — sport-coloured left accent only. */
+const ROW = `${ROW_BASE} border-border border-l-[color:var(--sport-color,transparent)] hover:border-[#c7ccd2]`;
+/** `.match-row.is-live` — live is the exception: the whole border (all sides)
+ *  turns red, not just the left accent. */
+const ROW_LIVE = `${ROW_BASE} border-[color:var(--live)]`;
+/** `.match-row` finished — muted gray left accent only (other sides normal). */
+const ROW_FINISHED = `${ROW_BASE} border-border border-l-[#9ca3af]`;
+/** `.row-date` (grid-area placement stays in globals.css) */
+const ROW_DATE =
+  'row-date flex min-w-0 flex-col items-start gap-[5px] whitespace-nowrap text-xs text-muted';
+/** `.row-sport` sport pill — tinted per-sport color is applied inline in
+ *  MatchRow (backgroundColor = sportColor + alpha, color = sportColor). */
+const ROW_SPORT =
+  'row-sport inline-flex max-w-full items-center gap-[5px] whitespace-nowrap rounded-full px-2 py-[2px]';
+/** `.row-main` (grid-area placement stays in globals.css) */
+const ROW_MAIN = 'row-main flex min-w-0 flex-col gap-1';
+/** `.row-status` (grid-area placement stays in globals.css) */
+const ROW_STATUS = 'row-status flex items-center gap-2 justify-self-end';
+/** `.row-team` (home side; `.row-team.away` adds justify-end) */
+const ROW_TEAM = 'flex min-w-0 items-center gap-2 text-[15px] font-bold';
+
+/** `.sk` shimmer block (pseudo-element rendered via `after:` utilities). */
+const SK =
+  'relative overflow-hidden rounded-lg bg-[#e8eaed] after:absolute after:inset-0 after:content-[""] after:animate-[shimmer_1.4s_infinite] after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent)] [[data-theme=dark]_&]:bg-border-soft [[data-theme=dark]_&]:after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)]';
+
+/** `.detail-countdown` inside `.player-placeholder` (48px, 32px ≤640). */
+const COUNTDOWN =
+  'whitespace-nowrap text-[48px] font-extrabold tabular-nums tracking-[0.01em] text-[#f3f4f6] max-[640px]:text-[32px]';
+/** `.detail-countdown.is-done` inside `.player-placeholder` (22px, 18px ≤640). */
+const COUNTDOWN_DONE =
+  'whitespace-nowrap text-[22px] font-bold tabular-nums tracking-[0.01em] text-[#9ca3af] max-[640px]:text-[18px]';
+
+/** `.channels-toggle` — open state handled by the separate string below. */
+const TOGGLE_BASE =
+  'absolute left-3 top-3 z-5 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-[7px] text-[13px] font-semibold backdrop-blur-[6px] transition-colors duration-150 bg-[rgba(255,255,255,0.9)] [[data-theme=dark]_&]:bg-[rgba(0,0,0,0.7)]';
+const TOGGLE = `${TOGGLE_BASE} border-border text-text`;
+/** `.channels-toggle.open` */
+const TOGGLE_OPEN = `${TOGGLE_BASE} border-accent text-accent`;
+
+/** `.channel-item` — active state handled by the separate string below. */
+const CHANNEL_ITEM =
+  'pointer-events-auto inline-flex max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-ellipsis rounded-full px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-[4px] transition-colors duration-150';
+const CHANNEL_IDLE = `${CHANNEL_ITEM} bg-[rgba(0,0,0,0.55)] hover:bg-[rgba(0,0,0,0.75)]`;
+/** `.channel-item.active` */
+const CHANNEL_ACTIVE = `${CHANNEL_ITEM} bg-[rgba(34,211,238,0.55)]`;
+
+/** `.error-banner` */
+const ERROR_BANNER =
+  'mb-4 rounded-xl border border-[rgba(239,68,68,0.45)] bg-[rgba(239,68,68,0.12)] px-4 py-3 text-[13px] whitespace-pre-wrap break-words text-[#c5221f] [[data-theme=dark]_&]:border-[#ef4444] [[data-theme=dark]_&]:bg-[rgba(255,255,255,0.08)] [[data-theme=dark]_&]:text-[#fca5a5]';
+
+
+export function TeamLogo({
+  path,
+  name,
+  sportType,
+  kind = 'team',
+  size = 'base',
+}: {
+  path?: string;
+  name?: string;
+  sportType?: number;
+  kind?: 'team' | 'league';
+  size?: LogoSize;
+}) {
   const [broken, setBroken] = useState(false);
   // Server actions already expand raw filenames, but cached payloads may
   // still carry a bare filename — resolve client-side as a safety net.
@@ -16,37 +121,38 @@ export function TeamLogo({ path, name, sportType, kind = 'team' }: { path?: stri
   useEffect(() => { setBroken(false); }, [src]);
   if (!src || broken) {
     const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
-    return <span className="logo logo-empty" aria-hidden="true">{initial}</span>;
+    return <span className={`${LOGO_EMPTY} ${LOGO_SIZE[size]}`} aria-hidden="true">{initial}</span>;
   }
   // Logo hostnames change/expire often and may not resolve from the server
   // network — load straight from upstream in the browser. onError falls back
   // to the initial-letter placeholder, never a broken image.
-  return <img className="logo" src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+  return <img className={`${LOGO_IMG} ${LOGO_SIZE[size]}`} src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
 }
 
 /** One side of a versus matchup. Singles render one logo+name; doubles
  * (tennis/badminton ganda) stack every player/team with their logo, matching
  * the app's "name[0] / name[2]" vs "name[1] / name[3]" pairing. */
-function TeamSide({ teams, sportType }: { teams?: Team[]; sportType?: number }) {
+function TeamSide({ teams, sportType, size = 'rowTeam' }: { teams?: Team[]; sportType?: number; size?: LogoSize }) {
   const list = teams?.length ? teams : [];
-  if (!list.length) return <span className="row-team-name">{'?'}</span>;
+  if (!list.length) return <span className={TEAM_NAME}>{'?'}</span>;
   return (
-    <span className="row-team-side">
+    <span className={TEAM_SIDE}>
       {list.map((t, i) => (
-        <span className="row-team-member" key={t.teamId ?? t.playerId ?? i}>
-          <TeamLogo path={t.logo} name={t.name} sportType={sportType} />
-          <span className="row-team-name">{t.name || '?'}</span>
+        <span className={TEAM_MEMBER} key={t.teamId ?? t.playerId ?? i}>
+          {i > 0 && <span className="mr-1.5 font-bold opacity-60">/</span>}
+          <TeamLogo path={t.logo} name={t.name} sportType={sportType} size={size} />
+          <span className={TEAM_NAME}>{t.name || '?'}</span>
         </span>
       ))}
     </span>
   );
 }
 
-export function StatusBadge({ status }: { status?: number }) {
+export function StatusBadge({ status, className }: { status?: number; className?: string }) {
   const live = isLiveStatus(status);
   return (
-    <span className={live ? 'status status-live' : 'status'}>
-      {live && <span className="dot" />}
+    <span className={`${live ? STATUS_LIVE : STATUS_IDLE}${className ? ` ${className}` : ''}`}>
+      {live && <span className={STATUS_DOT} />}
       {statusLabel(status)}
     </span>
   );
@@ -65,7 +171,7 @@ export function Countdown({ targetMs }: { targetMs: number }) {
 
   const diff = targetMs - now;
   if (diff <= 0) {
-    return <div className="detail-countdown is-done" role="timer">Starting…</div>;
+    return <div className={COUNTDOWN_DONE} role="timer">Starting…</div>;
   }
 
   const totalSec = Math.floor(diff / 1000);
@@ -78,22 +184,22 @@ export function Countdown({ targetMs }: { targetMs: number }) {
       ? `${days}d ${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`
       : `${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
 
-  return <div className="detail-countdown" role="timer">{clock}</div>;
+  return <div className={COUNTDOWN} role="timer">{clock}</div>;
 }
 
 export function MatchRowSkeleton() {
   return (
-    <div className="match-row skeleton-row">
-      <div className="sk sk-line w30" />
-      <div className="row-main">
-        <div className="sk sk-line w50" />
-        <div className="sk-row">
-          <div className="sk sk-circle" />
-          <div className="sk sk-line w70" />
-          <div className="sk sk-score" />
+    <div className={ROW}>
+      <div className={`${SK} h-3 w-[30%]`} />
+      <div className={ROW_MAIN}>
+        <div className={`${SK} h-3 w-1/2`} />
+        <div className="flex items-center gap-2.5">
+          <div className={`${SK} h-6 w-6 shrink-0 rounded-md`} />
+          <div className={`${SK} h-3 w-[70%]`} />
+          <div className={`${SK} ml-auto h-[18px] w-11 rounded-md`} />
         </div>
       </div>
-      <div className="sk sk-line w40" />
+      <div className={`${SK} h-3 w-2/5`} />
     </div>
   );
 }
@@ -107,6 +213,8 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
   const live = isLiveStatus(match.status);
   // Live/finished → missing score shown as 0; upcoming → shown as "-".
   const started = isStarted(match.status);
+  /** Finished / cancelled / cut → muted gray border instead of the sport accent. */
+  const finished = (match.status ?? 0) >= 10000;
   const score = (v?: number): number | string => (v ?? (started ? 0 : '-'));
   const league = match.league?.name || match.name || match.title || '—';
   const eventName = match.title || match.name || match.league?.name || '—';
@@ -117,41 +225,45 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
   return (
     <button
       type="button"
-      className={`match-row ${live ? 'is-live' : ''}`}
+      className={live ? ROW_LIVE : finished ? ROW_FINISHED : ROW}
       style={{ '--sport-color': color } as CSSProperties}
       onClick={onClick}
     >
-      <span className="row-date">
-        <span className="row-sport" title={sportName}>
-          <SportIcon className="row-sport-icon" />
-          <span className="row-sport-name">{sportName}</span>
+      <span className={ROW_DATE}>
+        <span className={ROW_SPORT} style={{ backgroundColor: `${color}26`, color }} title={sportName}>
+          <SportIcon className="h-[13px] w-[13px] shrink-0" />
+          <span className="truncate">{sportName}</span>
         </span>
-        <span className="row-date-text">{formatMatchDate(match.matchDate)}</span>
+        <span className="max-[768px]:hidden">{formatMatchDate(match.matchDate)}</span>
       </span>
 
-      <span className="row-main">
-        <span className="row-league">
-          <TeamLogo path={match.league?.logo} name={league} kind="league" />
-          <span className="row-league-name">{league}</span>
+      <span className={ROW_MAIN}>
+        <span className="flex min-w-0 items-center justify-center gap-1.5 text-xs font-semibold text-muted">
+          <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
+          <span className="truncate">{league}</span>
         </span>
 
         {scoring ? (
-          <span className="row-teams">
-            <span className="row-team">
+          <span className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+            <span className={ROW_TEAM}>
               <TeamSide teams={match.homeTeams?.length ? match.homeTeams : match.home ? [match.home] : []} sportType={match.sportType} />
             </span>
-            <span className="row-score">{score(match.homeScore)} : {score(match.awayScore)}</span>
-            <span className="row-team away">
+            {started ? (
+              <span className="whitespace-nowrap text-[17px] font-extrabold tabular-nums">{score(match.homeScore)} : {score(match.awayScore)}</span>
+            ) : (
+              <span className="whitespace-nowrap text-[13px] font-bold uppercase tracking-[0.08em] text-muted">VS</span>
+            )}
+            <span className={`${ROW_TEAM} justify-end`}>
               <TeamSide teams={match.awayTeams?.length ? match.awayTeams : match.away ? [match.away] : []} sportType={match.sportType} />
             </span>
           </span>
         ) : (
-          <span className="row-event" title={eventName}>{eventName}</span>
+          <span className="truncate text-[15px] font-bold" title={eventName}>{eventName}</span>
         )}
       </span>
 
-      <span className="row-status">
-        {match.hot && <Flame className="hot" />}
+      <span className={ROW_STATUS}>
+        {match.hot && <Flame className="h-3.5 w-3.5 shrink-0" />}
         <StatusBadge status={match.status} />
       </span>
     </button>
@@ -257,7 +369,7 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
     failedRef.current.clear();
   };
 
-  if (!m) return <p className="muted">No match data.</p>;
+  if (!m) return <p className="text-muted">No match data.</p>;
 
   const league = m.league?.name || m.name || m.title || '-';
   // Non-versus sports (e.g. Motorsport, Fighting, Cycling) have no home/away
@@ -274,44 +386,44 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
   const score = (v?: number): number | string => (v ?? (started ? 0 : '-'));
 
   return (
-    <div className="match-detail">
-      <div className="detail-head">
-        <TeamLogo path={m.league?.logo} name={league} kind="league" />
-        <div className="detail-head-text">
-          <strong>{league}</strong>
-          <div className="muted">
+    <div className="flex flex-col">
+      <div className="mb-4 flex items-center gap-3 max-[640px]:gap-2">
+        <TeamLogo path={m.league?.logo} name={league} kind="league" size="head" />
+        <div className="min-w-0">
+          <strong className="block text-[16px] max-[640px]:overflow-hidden max-[640px]:text-ellipsis max-[640px]:whitespace-nowrap">{league}</strong>
+          <div className="text-muted max-[640px]:overflow-hidden max-[640px]:text-ellipsis max-[640px]:whitespace-nowrap">
             {formatMatchDate(m.matchDate)}
             {m.round ? ` • Round ${m.round}` : ''}
             {m.season ? ` • ${m.season}` : ''}
           </div>
         </div>
-        <StatusBadge status={m.status} />
+        <StatusBadge status={m.status} className="ml-auto max-[640px]:shrink-0" />
       </div>
 
       {versus && (
-        <div className="detail-score">
-          <div className="detail-team">
-            <TeamSide teams={m.homeTeams?.length ? m.homeTeams : m.home ? [m.home] : []} sportType={m.sportType ?? sportType} />
+        <div className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-border px-6 py-5 [background:var(--detail-score-bg)] max-[640px]:gap-2.5 max-[640px]:px-3 max-[640px]:py-3.5">
+          <div className="flex min-w-0 flex-1 items-center gap-3 text-[16px] font-semibold last:justify-end max-[768px]:text-[15px] max-[640px]:gap-2 max-[640px]:text-[14px]">
+            <TeamSide teams={m.homeTeams?.length ? m.homeTeams : m.home ? [m.home] : []} sportType={m.sportType ?? sportType} size="detailTeam" />
           </div>
           {started ? (
-            <div className="detail-score-num">
+            <div className="whitespace-nowrap text-[28px] font-extrabold tabular-nums max-[768px]:text-[24px] max-[640px]:text-[22px]">
               {score(m.homeScore)} : {score(m.awayScore)}
             </div>
           ) : (
-            <div className="detail-kickoff">
-              <span className="detail-kickoff-time">{kickoffTime}</span>
-              <span className="detail-kickoff-label">Kick-off</span>
+            <div className="flex flex-col items-center gap-[3px] whitespace-nowrap">
+              <span className="text-[28px] font-extrabold tabular-nums tracking-[0.01em] max-[768px]:text-[24px] max-[640px]:text-[22px]">{kickoffTime}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted">Kick-off</span>
             </div>
           )}
-          <div className="detail-team">
-            <TeamSide teams={m.awayTeams?.length ? m.awayTeams : m.away ? [m.away] : []} sportType={m.sportType ?? sportType} />
+          <div className="flex min-w-0 flex-1 items-center gap-3 text-[16px] font-semibold last:justify-end max-[768px]:text-[15px] max-[640px]:gap-2 max-[640px]:text-[14px]">
+            <TeamSide teams={m.awayTeams?.length ? m.awayTeams : m.away ? [m.away] : []} sportType={m.sportType ?? sportType} size="detailTeam" />
           </div>
         </div>
       )}
 
-      <h4 className="stream-heading">Stream ({streams.length})</h4>
+      <h4 className="mb-2.5 mt-[18px] text-sm">Stream ({streams.length})</h4>
 
-      <div className="player-area">
+      <div className="relative mt-3.5 overflow-hidden rounded-xl border border-border bg-black">
         {playing ? (
           <StreamPlayer
             url={playing.url}
@@ -320,17 +432,17 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
             onReady={handleReady}
           />
         ) : showFrameCountdown ? (
-          <div className="player-placeholder">
-            <div className="player-placeholder-inner">
-              <p className="pp-label">Kick-off in</p>
+          <div className="relative flex aspect-video max-h-[480px] w-full items-center justify-center bg-black min-[1025px]:max-h-[560px]">
+            <div className="p-4 text-center text-muted">
+              <p className="mb-1 mt-0 text-xs font-bold uppercase tracking-[0.08em] text-[#9ca3af]">Kick-off in</p>
               <Countdown targetMs={kickoffMs} />
             </div>
           </div>
         ) : (
-          <div className="player-placeholder">
-            <div className="player-placeholder-inner">
-              <Tv className="pp-icon" />
-              <p>
+          <div className="relative flex aspect-video max-h-[480px] w-full items-center justify-center bg-black min-[1025px]:max-h-[560px]">
+            <div className="p-4 text-center text-muted">
+              <Tv className="h-10 w-10" />
+              <p className="mt-2.5 text-[13px]">
                 {streams.length
                   ? 'Select a channel to start watching'
                   : 'No streams available for this match.'}
@@ -342,7 +454,7 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
         {streams.length > 0 && (
           <button
             type="button"
-            className={`channels-toggle ${showChannels ? 'open' : ''}`}
+            className={showChannels ? TOGGLE_OPEN : TOGGLE}
             onClick={() => setShowChannels((v) => !v)}
           >
             <Tv size={14} />
@@ -351,28 +463,27 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
         )}
 
         {showChannels && streams.length > 0 && (
-          <div className="channel-overlay">
-            <div className="channel-overlay-head">
+          <div className="pointer-events-none absolute right-3 top-1/2 z-5 flex max-h-[calc(100%-24px)] max-w-[50%] -translate-y-1/2 flex-col items-end gap-1.5 overflow-y-auto">
+            <div>
               <span>Select Channel</span>
-              <button type="button" className="btn-icon" onClick={() => setShowChannels(false)} aria-label="Close">✕</button>
+              <button type="button" className="bg-transparent px-1.5 py-[2px] text-[13px] text-muted hover:text-text [[data-theme=dark]_&]:text-text" onClick={() => setShowChannels(false)} aria-label="Close">✕</button>
             </div>
-            <div className="channel-overlay-list">
+            <div>
               {streams.map((s, i) => {
                 const active = playing?.key === i;
-                const playable = isPlayable(s);
                 return (
                   <button
                     type="button"
                     key={i}
-                    className={`channel-item ${active ? 'active' : ''}`}
+                    className={active ? CHANNEL_ACTIVE : CHANNEL_IDLE}
                     onClick={() => handlePlay(s, i)}
                   >
-                    <span className={`channel-dot ${playable ? 'ok' : ''}`} />
-                    <span className="channel-name">{streamLabel(s, i)}</span>
+                    <span className="h-0 w-0" aria-hidden="true" />
+                    <span>{streamLabel(s, i)}</span>
                     {resolving === i ? (
-                      <Loader2 className="channel-loading spin" />
+                      <Loader2 className="animate-spin" />
                     ) : active ? (
-                      <Dot className="channel-live" />
+                      <Dot />
                     ) : null}
                   </button>
                 );
@@ -382,7 +493,7 @@ export function MatchDetail({ detail, resolveStream, sportType }: MatchDetailPro
         )}
       </div>
 
-      {playErr && <div className="error-banner">{playErr}</div>}
+      {playErr && <div className={ERROR_BANNER}>{playErr}</div>}
     </div>
   );
 }

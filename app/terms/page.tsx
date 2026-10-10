@@ -8,12 +8,17 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <>
-      <div className="back-bar">
-        <Link href="/" className="btn-back">← Back</Link>
-        <span className="muted mono">Terms</span>
+      <div className="mb-5 flex flex-wrap items-center gap-3 max-sm:gap-2">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-sm bg-accent-soft px-3.5 py-2 text-sm font-semibold text-accent no-underline transition hover:-translate-y-px hover:brightness-95"
+        >
+          ← Back
+        </Link>
+        <span className="font-mono text-xs text-muted">Terms</span>
       </div>
 
-      <section className="panel">
+      <section className="rounded border border-border bg-panel p-6 shadow max-sm:p-3.5">
         <h2>LSSHubTV Terms</h2>
         <p>
           1 - LSSHubTV (&quot;Us&quot; or &quot;We&quot;) provides the website and various

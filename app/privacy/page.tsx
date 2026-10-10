@@ -8,12 +8,17 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <>
-      <div className="back-bar">
-        <Link href="/" className="btn-back">← Back</Link>
-        <span className="muted mono">Privacy</span>
+      <div className="mb-5 flex flex-wrap items-center gap-3 max-sm:gap-2">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-sm bg-accent-soft px-3.5 py-2 text-sm font-semibold text-accent no-underline transition hover:-translate-y-px hover:brightness-95"
+        >
+          ← Back
+        </Link>
+        <span className="font-mono text-xs text-muted">Privacy</span>
       </div>
 
-      <section className="panel">
+      <section className="rounded border border-border bg-panel p-6 shadow max-sm:p-3.5">
         <h2>Privacy Policy</h2>
 
         <h3>1 Privacy Policy of LSSHubTV</h3>

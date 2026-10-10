@@ -94,64 +94,68 @@ function MatchListContent() {
       {/* Top banner — before the content. */}
       <AdBanner slotId="home-top" category="live" size="leaderboard" />
 
-      <div className="back-bar">
-        <span className="muted mono">Live</span>
-        <div className="back-bar-actions">
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+        <span className="font-mono text-xs text-muted">Live</span>
+        <div className="inline-flex items-center gap-3">
           <button
             type="button"
-            className="refresh-btn"
+            className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-[var(--radius-sm)] border border-border bg-panel text-base text-muted transition-all hover:border-[#c7ccd2] hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => void matchesQuery.refetch()}
             disabled={matchesQuery.isFetching}
             title="Refresh"
           >
-            {matchesQuery.isFetching ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+            {matchesQuery.isFetching ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
           </button>
         </div>
       </div>
 
-      <section className="search-bar">
+      <section className="mb-[18px] flex items-center gap-3">
         <input
-          className="search-input"
+          className="flex-1 rounded-xl border border-border bg-panel px-4 py-[11px] text-sm text-text transition-[border-color,box-shadow] placeholder:text-muted focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none"
           type="search"
           placeholder="Search teams, leagues, or matches…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         {matches && (
-          <span className="stats">
-            <span className="stat"><strong>{list.length}</strong> matches</span>
-            <span className="stat live"><span className="dot" />{liveCount} live</span>
+          <span className="flex gap-2.5 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-panel px-3.5 py-1.5 text-[13px] text-muted [&_strong]:text-text"><strong>{list.length}</strong> matches</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(239,68,68,0.4)] bg-live-soft px-3.5 py-1.5 text-[13px] text-[#d93025]"><span className="h-[7px] w-[7px] shrink-0 rounded-full bg-current" />{liveCount} live</span>
           </span>
         )}
       </section>
 
-      {err && <div className="error-banner">{err}</div>}
+      {err && (
+        <div className="mb-4 rounded-xl border border-[rgba(239,68,68,0.45)] bg-[rgba(239,68,68,0.12)] px-4 py-3 text-[13px] whitespace-pre-wrap break-words text-[#c5221f] [[data-theme=dark]_&]:border-[#ef4444] [[data-theme=dark]_&]:bg-[rgba(255,255,255,0.08)] [[data-theme=dark]_&]:text-[#fca5a5]">
+          {err}
+        </div>
+      )}
 
       {busy && !matches && (
-        <div className="match-list">
+        <div className="flex flex-col gap-2">
           {Array.from({ length: 6 }).map((_, i) => <MatchRowSkeleton key={i} />)}
         </div>
       )}
 
       {!busy && matches && sorted.length === 0 && (
-        <section className="panel empty-state">
-          <Inbox className="empty-icon" />
-          <h2>{emptyTitle}</h2>
-          <p className="muted">{emptyDesc}</p>
+        <section className="mb-4 rounded border border-border bg-panel px-5 py-10 text-center max-[640px]:px-4 max-[640px]:py-8">
+          <Inbox className="h-9 w-9" />
+          <h2 className="mt-2 mb-1.5 text-[19px]">{emptyTitle}</h2>
+          <p className="mb-3.5 text-sm leading-[1.65] text-muted">{emptyDesc}</p>
         </section>
       )}
 
       {groups.map((g, idx) => (
         <Fragment key={g.key}>
-          <section className="match-group">
-            <header className="group-head">
-              <span className={`group-title ${g.isLive ? 'is-live' : ''}`}>
-                <g.icon className="group-icon" />
+          <section className="mb-[22px]">
+            <header className="mb-2.5 flex items-center justify-between">
+              <span className={g.isLive ? 'inline-flex items-center gap-2 text-sm font-bold text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]' : 'inline-flex items-center gap-2 text-sm font-bold text-text'}>
+                <g.icon className="h-[15px] w-[15px]" />
                 {g.label}
-                <span className="group-count">{g.items.length}</span>
+                <span className="rounded-full border border-border bg-panel px-2 py-px text-[11px] font-bold text-muted">{g.items.length}</span>
               </span>
             </header>
-            <div className="match-list">
+            <div className="flex flex-col gap-2">
               {g.items.map((m, i) => (
                 <MatchRow
                   key={`${m.matchId}-${i}`}

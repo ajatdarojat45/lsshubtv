@@ -134,10 +134,12 @@ export default function VideoPlayer({
   }, [streamUrl, referer, autoPlay]);
 
   return (
-    <div className={`video-player ${className ?? ''}`}>
+    <div
+      className={`relative aspect-[16/9] bg-panel border border-border rounded-[var(--radius)] ${className ?? ''}`}
+    >
       <video
         ref={videoRef}
-        className="video-player-element"
+        className="absolute inset-0 w-full h-full object-contain bg-bg"
         controls={controls}
         autoPlay={autoPlay}
         muted={muted}
@@ -148,7 +150,10 @@ export default function VideoPlayer({
         aria-label={title || 'Video player'}
       />
       {error && (
-        <p className="video-player-error" role="alert">
+        <p
+          className="absolute inset-x-3 bottom-3 m-0 whitespace-pre-wrap break-words rounded-lg bg-[rgba(0,0,0,0.6)] px-3 py-2.5 text-[13px] text-[#fca5a5]"
+          role="alert"
+        >
           {error}
         </p>
       )}
