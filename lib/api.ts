@@ -182,3 +182,24 @@ export function getLiveMatchDetail({ version, matchId, sportType, language }: Ma
   const params = md5(qs).slice(0, 6);
   return getProtobuf(`${LIVE_API}/sfver${params}${version}/match/detail?${qs}`);
 }
+
+/** Match analysis / head-to-head (PBMatchAnalysisResp, endpoint code 107). */
+export function getMatchAnalysis({ version, matchId, sportType, language }: MatchDetailQuery) {
+  const qs = `matchId=${matchId}&sportType=${sportType}&language=${language}`;
+  const params = md5(qs).slice(0, 6);
+  return getProtobuf(`${DATA_API}/sfver${params}${version}/api/match/analysis?${qs}`);
+}
+
+/** Match lineup (PBMatchLineupResp, endpoint code 106). */
+export function getMatchLineup({ version, matchId, sportType, language }: MatchDetailQuery) {
+  const qs = `matchId=${matchId}&sportType=${sportType}&language=${language}`;
+  const params = md5(qs).slice(0, 6);
+  return getProtobuf(`${DATA_API}/sfver${params}${version}/api/match/lineup?${qs}`);
+}
+
+/** Match events (PBMatchEventResp, endpoint code 105): goals, cards, substitutions. */
+export function getMatchEvent({ version, matchId, sportType, language }: MatchDetailQuery) {
+  const qs = `matchId=${matchId}&sportType=${sportType}&language=${language}`;
+  const params = md5(qs).slice(0, 6);
+  return getProtobuf(`${DATA_API}/sfver${params}${version}/api/match/event?${qs}`);
+}

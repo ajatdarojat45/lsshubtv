@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery, useMutation } from '@tanstack/react-query';
-import { getMatches, getMatchDetail, getStreamUrl, getAllLiveMatches } from '@/app/actions';
+import { getMatches, getMatchDetail, getMatchAnalysis, getMatchLineup, getMatchEvent, getStreamUrl, getAllLiveMatches } from '@/app/actions';
 
 /** Never auto-retry a rate-limit (HTTP 429): re-hitting immediately makes the
  * upstream limiter angrier and starves the UI. Other errors get one retry. */
@@ -102,6 +102,56 @@ export function useMatchDetail(matchId: string | number, sportType?: number) {
       return res.data;
     },
     enabled: Boolean(matchId),
+    retry: retryPolicy,
+    retryDelay,
+    ...DETAIL_POLL,
+  });
+}
+
+/** Head-to-head / match analysis for a detail page. No background polling:
+ *  the detail page is read-then-play and the analysis endpoint is rate-limited. */
+export function useMatchAnalysis(matchId: string | number, sportType?: number) {
+  return useQuery({
+    queryKey: ['match-analysis', matchId, sportType],
+    queryFn: async () => {
+      const res = await getMatchAnalysis({ matchId, sportType, language: 0 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: Boolean(matchId) && Number(sportType) > 0,
+    retry: retryPolicy,
+    retryDelay,
+    ...DETAIL_POLL,
+  });
+}
+
+/** Match lineup for a detail page. No background polling (see useMatchAnalysis). */
+export function useMatchLineup(matchId: string | number, sportType?: number) {
+  return useQuery({
+    queryKey: ['match-lineup', matchId, sportType],
+    queryFn: async () => {
+      const res = await getMatchLineup({ matchId, sportType, language: 0 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: Boolean(matchId) && Number(sportType) > 0,
+    retry: retryPolicy,
+    retryDelay,
+    ...DETAIL_POLL,
+  });
+}
+
+/** Match events (goals, cards, substitutions) for a detail page. No background
+ *  polling (see useMatchAnalysis). */
+export function useMatchEvent(matchId: string | number, sportType?: number) {
+  return useQuery({
+    queryKey: ['match-event', matchId, sportType],
+    queryFn: async () => {
+      const res = await getMatchEvent({ matchId, sportType, language: 0 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: Boolean(matchId) && Number(sportType) > 0,
     retry: retryPolicy,
     retryDelay,
     ...DETAIL_POLL,

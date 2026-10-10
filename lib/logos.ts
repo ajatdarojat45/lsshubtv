@@ -19,11 +19,11 @@ export function getLogoHost(): string {
 
 export const LOGO_HOST = DEFAULT_LOGO_HOST;
 
-const FOOTBALL_TEAM_LOGO_PATH = '/aelogo/football/team/';
-const BASKETBALL_TEAM_PATH = '/aelogo/basketball/team/';
-const BASEBALL_TEAM_PATH = '/aelogo/baseball/team/';
-const VOLLEYBALL_TEAM_PATH = '/aelogo/volleyball/team/';
-const AELOGO_V2_PATH = '/aelogo/v2/team/';
+const FOOTBALL_PATH = '/aelogo/football';
+const BASKETBALL_PATH = '/aelogo/basketball';
+const BASEBALL_PATH = '/aelogo/baseball';
+const VOLLEYBALL_PATH = '/aelogo/volleyball';
+const AELOGO_V2_PATH = '/aelogo/v2';
 const LIN_LOGO_PATH = '/linlogo/res/image/data/';
 const COUNTRY_LOGO_PATH = '/aelogo/country/';
 
@@ -56,10 +56,18 @@ function joinHost(host: string, path: string | null): string {
   return `${base}${path}`;
 }
 
-/** Team logo — same per-sport path mapping as LogoConstant.getTeamLogo. */
-export function teamLogoUrl(
+/** Team logo vs player avatar — mirrors the web resolver's `aI(x, 'team'|'player')`,
+ *  which swaps the `<sport>/<kind>/` path segment (avatar uses `.../<sport>/player/<file>`). */
+type LogoKind = 'team' | 'player';
+
+/** Resolve a bare filename (or absolute URL) to a full logo/avatar URL.
+ *  The sport + kind determine the directory: `.../aelogo/<sport>/<kind>/<file>` for
+ *  team sports, `/aelogo/v2/<kind>/` for racket/net sports, `/linlogo/...` for the
+ *  shared path (american football / rugby / aussie rules — no kind segment). */
+function logoUrl(
   sportType: number | undefined,
   raw: string | undefined,
+  kind: LogoKind,
   host?: string
 ): string {
   const logoHost = host || getLogoHost();
@@ -71,26 +79,44 @@ export function teamLogoUrl(
   const filename = t.split('/').pop() || t;
   let dir: string | null = null;
   switch (sportType) {
-    case 1: dir = FOOTBALL_TEAM_LOGO_PATH; break;
-    case 2: dir = BASKETBALL_TEAM_PATH; break;
+    case 1: dir = `${FOOTBALL_PATH}/${kind}/`; break;
+    case 2: dir = `${BASKETBALL_PATH}/${kind}/`; break;
     case 3: // tennis
     case 12: // badminton
     case 6: // cricket
     case 11: // hockey
     case 16: // handball
-      dir = AELOGO_V2_PATH; break;
+      dir = `${AELOGO_V2_PATH}/${kind}/`; break;
     case 8: // rugby
     case 9: // american football
     case 10: // aussie rules
       dir = LIN_LOGO_PATH; break;
-    case 4: dir = BASEBALL_TEAM_PATH; break;
-    case 13: dir = VOLLEYBALL_TEAM_PATH; break;
+    case 4: dir = `${BASEBALL_PATH}/${kind}/`; break;
+    case 13: dir = `${VOLLEYBALL_PATH}/${kind}/`; break;
     default:
       // Sports without a mapping in the original app (motorsport 7,
       // fighting 14, cycling 15, others 90, ...) — keep the generic path.
-      dir = AELOGO_V2_PATH; break;
+      dir = `${AELOGO_V2_PATH}/${kind}/`; break;
   }
   return joinHost(logoHost, dir ? `${dir}${filename}` : null);
+}
+
+/** Team logo — same per-sport path mapping as LogoConstant.getTeamLogo. */
+export function teamLogoUrl(
+  sportType: number | undefined,
+  raw: string | undefined,
+  host?: string
+): string {
+  return logoUrl(sportType, raw, 'team', host);
+}
+
+/** Player avatar — `.../aelogo/<sport>/player/<file>` (web resolver's `aI(x,'player')`). */
+export function playerAvatarUrl(
+  sportType: number | undefined,
+  raw: string | undefined,
+  host?: string
+): string {
+  return logoUrl(sportType, raw, 'player', host);
 }
 
 /** League/country badge — mirrors LogoConstant.getCountryLogo. */

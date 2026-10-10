@@ -28,7 +28,7 @@
 
 import { iterFields } from './proto';
 import { countryLogoUrl, teamLogoUrl } from './logos';
-import type { Team, League, Contender, Match, Stream, MatchDetail } from './types';
+import type { Team, League, Contender, Match, Stream, MatchDetail, MatchAnalysis, H2HSummary, LineupPlayer, MatchLineup, MatchEvent, MatchEvents } from './types';
 
 const dec = new TextDecoder('utf-8', { fatal: false });
 /** Decode a length-delimited field. Never throws on varint input (returns ''). */
@@ -366,6 +366,155 @@ export function decodeMatchDetailResp(payload: Uint8Array, lang: number): MatchD
   }
   return out;
 }
+
+/** PBMatchAnalysisResp (code 107): 1=h2h, 2=homeLatest, 3=awayLatest, 4=homeNext, 5=awayNext.
+ *  Each list item is a full PBDataMatch (contenders + home/away scores). */
+export function decodeMatchAnalysisResp(payload: Uint8Array, lang: number): MatchAnalysis {
+  const out: MatchAnalysis = { h2h: [], homeLatest: [], awayLatest: [], homeNext: [], awayNext: [] };
+  for (const f of iterFields(payload)) {
+    if (f.wire !== 2) continue;
+    const m = decodeDataMatch(f.value as Uint8Array, lang);
+    if (f.field === 1) out.h2h.push(m);
+    else if (f.field === 2) out.homeLatest.push(m);
+    else if (f.field === 3) out.awayLatest.push(m);
+    else if (f.field === 4) out.homeNext.push(m);
+    else if (f.field === 5) out.awayNext.push(m);
+  }
+  return out;
+}
+
+/* ---------- lineup (PBMatchLineupResp, code 106) ---------- */
+
+/** PBPlayerPositionType → readable label. */
+export const positionLabel = (code?: number): string =>
+  ({ 1: 'Forward', 2: 'Midfielder', 3: 'Defender', 4: 'Goalkeeper' } as Record<number, string>)[code ?? 0] ?? '—';
+
+/** PBPlayerAppearanceType → starting/substitute. */
+export const appearanceLabel = (code?: number): string =>
+  ({ 1: 'Starting', 2: 'Substitute' } as Record<number, string>)[code ?? 0] ?? '';
+
+/** PBDataMatchLineup: 1=player(PBDataPlayer), 2=position, 3=positionOrder, 4=appearance, 5=number. */
+function decodeDataMatchLineup(buf: Uint8Array, lang: number): LineupPlayer {
+  const out: LineupPlayer = {};
+  for (const f of iterFields(buf)) {
+    if (f.field === 1 && f.wire === 2) out.player = decodeDataPlayer(f.value as Uint8Array, lang);
+    else if (f.field === 2) out.position = f.value as number;
+    else if (f.field === 3) out.positionOrder = f.value as number;
+    else if (f.field === 4) out.appearance = f.value as number;
+    else if (f.field === 5 && f.wire === 2) out.number = str(f.value);
+  }
+  return out;
+}
+
+/** PBMatchLineupResp: 1=homeLineup, 2=awayLineup (each repeated PBDataMatchLineup). */
+export function decodeMatchLineupResp(payload: Uint8Array, lang: number): MatchLineup {
+  const out: MatchLineup = { home: [], away: [] };
+  for (const f of iterFields(payload)) {
+    if (f.wire !== 2) continue;
+    if (f.field === 1) out.home.push(decodeDataMatchLineup(f.value as Uint8Array, lang));
+    else if (f.field === 2) out.away.push(decodeDataMatchLineup(f.value as Uint8Array, lang));
+  }
+  return out;
+}
+
+/* ---------- events (PBMatchEventResp, code 105) ---------- */
+
+/** PBMatchEventType → readable label. */
+export const eventTypeLabel = (code?: number): string =>
+  ({
+    101: 'Goal',
+    102: 'Own Goal',
+    103: 'Penalty Goal',
+    104: 'Penalty Missed',
+    105: 'Substitution',
+    106: 'Yellow Card',
+    107: 'Red Card',
+    108: 'Second Yellow',
+    109: 'Corner',
+    10001: 'Kick Off',
+    10002: 'Full Time',
+    10003: 'Half Time',
+    10005: 'Finished',
+  } as Record<number, string>)[code ?? 0] ?? '';
+
+/** PBDataMatchEvent: 1=match, 2=team, 3=eventType, 4=minute, 5=score,
+ *  6=description, 7=teamSide, 10=scorer, 11=assistant, 20=offender,
+ *  30=substitutionIn, 31=substitutionOut. */
+function decodeDataMatchEvent(buf: Uint8Array, lang: number): MatchEvent {
+  const out: MatchEvent = { eventType: 0 };
+  for (const f of iterFields(buf)) {
+    if (f.field === 3) out.eventType = f.value as number;
+    else if (f.field === 4 && f.wire === 2) out.minute = str(f.value);
+    else if (f.field === 5 && f.wire === 2) out.score = str(f.value);
+    else if (f.field === 6 && f.wire === 2) out.description = str(f.value);
+    else if (f.field === 7) out.teamSide = f.value as number;
+    else if (f.field === 10 && f.wire === 2) out.scorer = decodeDataPlayer(f.value as Uint8Array, lang);
+    else if (f.field === 11 && f.wire === 2) out.assistant = decodeDataPlayer(f.value as Uint8Array, lang);
+    else if (f.field === 20 && f.wire === 2) out.offender = decodeDataPlayer(f.value as Uint8Array, lang);
+    else if (f.field === 30 && f.wire === 2) out.substitutionIn = decodeDataPlayer(f.value as Uint8Array, lang);
+    else if (f.field === 31 && f.wire === 2) out.substitutionOut = decodeDataPlayer(f.value as Uint8Array, lang);
+  }
+  return out;
+}
+
+/** PBMatchEventResp: 1 = repeated PBDataMatchEvent. */
+export function decodeMatchEventResp(payload: Uint8Array, lang: number): MatchEvents {
+  const out: MatchEvent[] = [];
+  for (const f of iterFields(payload)) {
+    if (f.field === 1 && f.wire === 2) out.push(decodeDataMatchEvent(f.value as Uint8Array, lang));
+  }
+  return out;
+}
+
+/** Per-player event stats, keyed by playerId, for annotating lineup rows with
+ *  goals / assists / cards / substitutions. */
+export interface PlayerEventStats {
+  goals: number;
+  assists: number;
+  yellow: number;
+  red: number;
+  subIn: boolean;
+  subOut: boolean;
+}
+
+const GOAL_TYPES = new Set([101, 102, 103]);
+
+/** Aggregate events into per-player stats (match by playerId). */
+export function computePlayerEventStats(events: MatchEvents | undefined): Map<number, PlayerEventStats> {
+  const map = new Map<number, PlayerEventStats>();
+  if (!events) return map;
+  const slot = (p: Team | undefined): PlayerEventStats | null => {
+    const id = p?.playerId;
+    if (!id) return null;
+    let s = map.get(id);
+    if (!s) { s = { goals: 0, assists: 0, yellow: 0, red: 0, subIn: false, subOut: false }; map.set(id, s); }
+    return s;
+  };
+  for (const e of events) {
+    switch (e.eventType) {
+      case 101: case 102: case 103: {
+        const s = slot(e.scorer);
+        if (s) s.goals += 1;
+        const a = slot(e.assistant);
+        if (a) a.assists += 1;
+        break;
+      }
+      case 106: { const s = slot(e.offender); if (s) s.yellow += 1; break; }
+      case 107: case 108: { const s = slot(e.offender); if (s) s.red += 1; break; }
+      case 105: {
+        const i = slot(e.substitutionIn); if (i) i.subIn = true;
+        const o = slot(e.substitutionOut); if (o) o.subOut = true;
+        break;
+      }
+      default: break;
+    }
+  }
+  return map;
+}
+
+/** Human "minute" label (events carry it as a string like "45+2"). */
+export const eventMinute = (e: MatchEvent): string => (e.minute ? `${e.minute}'` : '');
+
 /* ---------- live.proto (LiveAPI) ---------- */
 
 function decodeLiveTeam(buf: Uint8Array): Team {
@@ -447,6 +596,48 @@ export function formatMatchDate(matchDate?: number): string {
   return new Date(ms).toLocaleString('en-US', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
   });
+}
+
+/** Win / draw / loss summary from a head-to-head list, from `ref`'s perspective.
+ *  H2H fixtures alternate home/away, so we locate the reference team on either
+ *  side (by teamId, falling back to name) and compare its score. */
+export function computeH2HSummary(h2h: Match[], ref: Team | undefined): H2HSummary {
+  let wins = 0;
+  let draws = 0;
+  let losses = 0;
+  let total = 0;
+  const refId = ref?.teamId;
+  const refName = ref?.name;
+  for (const m of h2h) {
+    // proto3 omits a 0 score, so a missing score field means 0.
+    const hs = m.homeScore ?? 0;
+    const as = m.awayScore ?? 0;
+    let refScore: number | undefined;
+    let oppScore: number | undefined;
+    if (refId !== undefined) {
+      if (m.home?.teamId === refId) { refScore = hs; oppScore = as; }
+      else if (m.away?.teamId === refId) { refScore = as; oppScore = hs; }
+    }
+    if (refScore === undefined && refName) {
+      if (m.home?.name === refName) { refScore = hs; oppScore = as; }
+      else if (m.away?.name === refName) { refScore = as; oppScore = hs; }
+    }
+    if (refScore === undefined || oppScore === undefined) continue;
+    total += 1;
+    if (refScore > oppScore) wins += 1;
+    else if (refScore < oppScore) losses += 1;
+    else draws += 1;
+  }
+  const pct = (n: number): number => (total === 0 ? 0 : Math.round((n / total) * 1000) / 10);
+  return {
+    total,
+    wins,
+    draws,
+    losses,
+    winPct: pct(wins),
+    drawPct: pct(draws),
+    lossPct: pct(losses),
+  };
 }
 
 

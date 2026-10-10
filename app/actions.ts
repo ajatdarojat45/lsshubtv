@@ -6,6 +6,9 @@ import {
   getLiveMatchLive,
   getMatchDetail as apiGetMatchDetail,
   getLiveMatchDetail as apiGetLiveMatchDetail,
+  getMatchAnalysis as apiGetMatchAnalysis,
+  getMatchLineup as apiGetMatchLineup,
+  getMatchEvent as apiGetMatchEvent,
   getStreamDetailFull,
 } from '@/lib/api';
 import {
@@ -13,6 +16,9 @@ import {
   decodeLiveMatchList,
   decodeMatchDetailResp,
   decodeLiveMatchDetail,
+  decodeMatchAnalysisResp,
+  decodeMatchLineupResp,
+  decodeMatchEventResp,
   decodeDataStream,
   isLiveStatus,
 } from '@/lib/matchProto';
@@ -20,7 +26,7 @@ import { signPlayUrl } from '@/lib/sign';
 import { iterFields, rot47 } from '@/lib/proto';
 import { SPORTS } from '@/lib/sports';
 import { DEFAULT_CONTINENT, DEFAULT_COUNTRY, DEFAULT_SITE_TYPE } from '@/lib/config';
-import type { Match, MatchDetail, MatchSource, Stream } from '@/lib/types';
+import type { Match, MatchDetail, MatchAnalysis, MatchLineup, MatchEvents, MatchSource, Stream } from '@/lib/types';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -79,7 +85,7 @@ async function ensureSignatures(sportType: number): Promise<Record<number, strin
   if (cached) return cached;
   // Coalesce concurrent signature fetches for the same sport.
   return withCache(`sig:${key}`, 10 * 60_000, async () => {
-    const r = await getDataBS([100, 102], num(sportType));
+    const r = await getDataBS([100, 102, 105, 106, 107], num(sportType));
     sigCache.set(key, r.signatures);
     return r.signatures;
   });
@@ -182,6 +188,66 @@ export async function getMatchDetail(
         ? decodeLiveMatchDetail(data)
         : decodeMatchDetailResp(data, num(language));
     return { ok: true, data: detail };
+  } catch (e) {
+    return { ok: false, error: errMsg(e) };
+  }
+}
+
+/** Head-to-head / match analysis (endpoint code 107). */
+export async function getMatchAnalysis(
+  { matchId, sportType = 1, language = 0 }: MatchDetailParams
+): Promise<Result<MatchAnalysis>> {
+  try {
+    const s = await ensureSignatures(sportType);
+    const args = {
+      version: s[107],
+      matchId: num(matchId),
+      sportType: num(sportType),
+      language: num(language),
+    };
+    const r = await apiGetMatchAnalysis(args);
+    const data = r.pb?.data ?? r.payload;
+    return { ok: true, data: decodeMatchAnalysisResp(data, num(language)) };
+  } catch (e) {
+    return { ok: false, error: errMsg(e) };
+  }
+}
+
+/** Match lineup (endpoint code 106). */
+export async function getMatchLineup(
+  { matchId, sportType = 1, language = 0 }: MatchDetailParams
+): Promise<Result<MatchLineup>> {
+  try {
+    const s = await ensureSignatures(sportType);
+    const args = {
+      version: s[106],
+      matchId: num(matchId),
+      sportType: num(sportType),
+      language: num(language),
+    };
+    const r = await apiGetMatchLineup(args);
+    const data = r.pb?.data ?? r.payload;
+    return { ok: true, data: decodeMatchLineupResp(data, num(language)) };
+  } catch (e) {
+    return { ok: false, error: errMsg(e) };
+  }
+}
+
+/** Match events (endpoint code 105): goals, cards, substitutions. */
+export async function getMatchEvent(
+  { matchId, sportType = 1, language = 0 }: MatchDetailParams
+): Promise<Result<MatchEvents>> {
+  try {
+    const s = await ensureSignatures(sportType);
+    const args = {
+      version: s[105],
+      matchId: num(matchId),
+      sportType: num(sportType),
+      language: num(language),
+    };
+    const r = await apiGetMatchEvent(args);
+    const data = r.pb?.data ?? r.payload;
+    return { ok: true, data: decodeMatchEventResp(data, num(language)) };
   } catch (e) {
     return { ok: false, error: errMsg(e) };
   }

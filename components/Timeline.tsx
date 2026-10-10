@@ -1,0 +1,231 @@
+'use client';
+
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
+import type { MatchEvent, MatchEvents } from '@/lib/types';
+import { eventMinute, eventTypeLabel } from '@/lib/matchProto';
+import { playerAvatarUrl } from '@/lib/logos';
+
+/** Surface panel, matching the `.panel` style used across the detail page. */
+const PANEL =
+  'mb-4 rounded border border-border bg-panel px-5 py-5 max-[640px]:px-3.5 max-[640px]:py-3.5';
+
+/** Events that are worth showing on the timeline (skip the bookkeeping noise
+ *  like kick-off / half-time / full-time markers). */
+const VISIBLE = new Set([
+  101, 102, 103, 104, 105, 106, 107, 108, 109,
+  10020, 10021,
+]);
+
+/** Sort by match minute, preserving original order within the same minute.
+ *  Minute strings look like "45+2" — parse to a comparable number. */
+function minuteValue(e: MatchEvent): number {
+  const raw = (e.minute ?? '').trim();
+  if (!raw) return 0;
+  const [base, extra] = raw.split('+');
+  const n = Number(base) || 0;
+  const x = Number(extra) || 0;
+  return n + x * 0.1;
+}
+
+/** Icon + accent text colour + spine dot colour for an event type. */
+function eventMeta(code: number): { icon: string; cls: string; dot: string } {
+  switch (code) {
+    case 101:
+    case 103:
+    case 10020:
+      return { icon: '⚽', cls: 'text-[#16a34a]', dot: 'bg-[#16a34a]' };
+    case 102:
+      return { icon: '⚽', cls: 'text-[#dc2626]', dot: 'bg-[#dc2626]' };
+    case 104:
+    case 10021:
+      return { icon: '✖', cls: 'text-muted', dot: 'bg-[#9ca3af]' };
+    case 106:
+      return { icon: '🟨', cls: '', dot: 'bg-[#eab308]' };
+    case 107:
+    case 108:
+      return { icon: '🟥', cls: '', dot: 'bg-[#dc2626]' };
+    case 105:
+      return { icon: '🔄', cls: 'text-accent', dot: 'bg-accent' };
+    case 109:
+      return { icon: '🚩', cls: 'text-muted', dot: 'bg-[#9ca3af]' };
+    default:
+      return { icon: '•', cls: 'text-muted', dot: 'bg-[#9ca3af]' };
+  }
+}
+
+/** Player avatar (or an initial chip when there's no image), mirrored-safe. */
+function Avatar({
+  name,
+  logo,
+  sportType,
+}: {
+  name?: string;
+  logo?: string;
+  sportType?: number;
+}) {
+  const url = logo ? playerAvatarUrl(sportType, logo) : '';
+  const initial = (name || '?').charAt(0).toUpperCase();
+  return url ? (
+    <img
+      src={url}
+      alt={name ?? ''}
+      loading="lazy"
+      className="h-8 w-8 shrink-0 rounded-full bg-[#f1f3f5] object-cover [[data-theme=dark]_&]:bg-border-soft"
+    />
+  ) : (
+    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e8eaed] text-[12px] font-bold text-muted [[data-theme=dark]_&]:bg-border-soft">
+      {initial}
+    </span>
+  );
+}
+
+/** Secondary line under the player name (assist / own goal / sub-out / note). */
+function subLine(e: MatchEvent): ReactNode {
+  if ((e.eventType === 101 || e.eventType === 103) && e.assistant?.name)
+    return (
+      <span className="w-full truncate text-[11px] leading-tight text-muted">
+        assist: {e.assistant.name}
+      </span>
+    );
+  if (e.eventType === 102)
+    return <span className="w-full truncate text-[11px] leading-tight text-muted">own goal</span>;
+  if (e.eventType === 105 && e.substitutionOut?.name)
+    return (
+      <span className="w-full truncate text-[11px] leading-tight text-muted">
+        <span className="text-[#dc2626]">↓</span> {e.substitutionOut.name}
+      </span>
+    );
+  if (e.description)
+    return <span className="w-full truncate text-[11px] leading-tight text-muted">{e.description}</span>;
+  return null;
+}
+
+function EventRow({
+  e,
+  side,
+  sportType,
+}: {
+  e: MatchEvent;
+  side: 'home' | 'away';
+  sportType?: number;
+}) {
+  const { icon, cls, dot } = eventMeta(e.eventType);
+  const away = side === 'away';
+  const player = e.scorer ?? e.offender ?? e.substitutionIn;
+  const main =
+    e.eventType === 105 ? (
+      <span className="w-full truncate text-[13px] font-semibold leading-tight">
+        <span className="text-[#16a34a]">↑</span> {e.substitutionIn?.name ?? 'Substitution'}
+      </span>
+    ) : (
+      <span className="w-full truncate text-[13px] font-semibold leading-tight">
+        {player?.name || eventTypeLabel(e.eventType)}
+      </span>
+    );
+  const card = (
+    <div
+      className={`flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 ${
+        away ? 'flex-row-reverse text-right' : ''
+      }`}
+    >
+      <span className={`shrink-0 text-[15px] leading-none ${cls}`}>{icon}</span>
+      <Avatar name={player?.name} logo={player?.logo} sportType={sportType} />
+      <span className={`flex min-w-0 flex-1 flex-col ${away ? 'items-end' : 'items-start'}`}>
+        {main}
+        {subLine(e)}
+      </span>
+    </div>
+  );
+  // Centre spine: minute on top, then the score, then a coloured dot that sits
+  // on the vertical line. The dot flows *below* the text (not absolutely
+  // positioned) so it never covers the scoreline. It stays centred on the line
+  // because the spine column is the middle, equally-flanked 1fr/auto/1fr column
+  // and this flex column already centres its children.
+  const spine = (
+      <span className="flex w-11 shrink-0 flex-col items-center">
+        <span className="rounded bg-panel px-1.5 text-[12px] font-bold tabular-nums text-muted">{eventMinute(e)}</span>
+        {e.score && <span className="mt-0.5 rounded bg-panel px-1 text-[10px] tabular-nums text-muted">{e.score}</span>}
+      {/* Dot with a ring cut out so it punches through the vertical line. */}
+      <span
+        aria-hidden
+        className={`mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-panel ${dot}`}
+      />
+    </span>
+  );
+  // Home events on the left, away events on the right, spine pinned centre.
+  return away ? (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2.5">
+      <div />
+      {spine}
+      {card}
+    </div>
+  ) : (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2.5">
+      {card}
+      {spine}
+      <div />
+    </div>
+  );
+}
+
+export function Timeline({
+  events,
+  sportType,
+}: {
+  events: MatchEvents;
+  sportType?: number;
+}) {
+  const [open, setOpen] = useState(true);
+  const list = [...events]
+    .filter((e) => VISIBLE.has(e.eventType))
+    .sort((a, b) => minuteValue(a) - minuteValue(b));
+
+  if (!list.length) return null;
+
+  return (
+    <section className={PANEL}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="mb-3 flex w-full cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="text-[15px] font-bold">Timeline</span>
+          <span className="rounded-full bg-card px-2 py-0.5 text-[11px] text-muted">
+            {list.length} events
+          </span>
+        </span>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+      <div className="relative">
+        {/* Vertical timeline line down the centre. The centre spine column is
+            exactly half the width (both side columns are equal 1fr), so this
+            line meets every event's dot. Each dot's ring masks the line where
+            they overlap, so events still read as distinct nodes. */}
+        <div
+          aria-hidden
+          className="absolute bottom-4 left-1/2 top-4 z-0 w-px -translate-x-1/2 bg-border"
+        />
+        <div className="relative z-10 flex flex-col gap-1.5">
+          {list.map((e, i) => (
+            <EventRow
+              key={`${e.eventType}-${e.minute}-${i}`}
+              e={e}
+              side={e.teamSide === 2 ? 'away' : 'home'}
+              sportType={sportType}
+            />
+          ))}
+        </div>
+      </div>
+      )}
+    </section>
+  );
+}

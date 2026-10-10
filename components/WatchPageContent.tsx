@@ -7,10 +7,11 @@ import { CircleCheck, Loader2, RefreshCw, Share2, ThumbsUp, X } from 'lucide-rea
 import { useRB } from '@/components/RBProvider';
 import { Countdown, MatchRow, StatusBadge } from '@/components/Match';
 import { isLiveStatus, isStarted, matchDateMs, isPlayable, statusLabel } from '@/lib/matchProto';
-import { useSportMatches, useMatchDetail, useStreamUrl } from '@/lib/queries';
+import { useSportMatches, useMatchDetail, useMatchAnalysis, useMatchLineup, useMatchEvent, useStreamUrl } from '@/lib/queries';
 import { sportSlug, sportLabel } from '@/lib/sports';
 import VideoPlayer from '@/components/VideoPlayer';
 import AdBanner from '@/components/AdBanner';
+import { MatchTabs } from '@/components/MatchTabs';
 import type { Match, Stream } from '@/lib/types';
 
 /** Surface panel (`.panel`): bordered card on the app background. */
@@ -61,6 +62,9 @@ export function WatchPageContent({ id }: { id: string }) {
   const sportType = listMatch?.sportType ?? preferredSport;
 
   const detailQuery = useMatchDetail(matchId, sportType);
+  const analysisQuery = useMatchAnalysis(matchId, sportType);
+  const lineupQuery = useMatchLineup(matchId, sportType);
+  const eventQuery = useMatchEvent(matchId, sportType);
   const streamMutation = useStreamUrl();
 
   const detail = detailQuery.data;
@@ -312,6 +316,16 @@ export function WatchPageContent({ id }: { id: string }) {
               </div>
             </div>
           </section>
+
+          {/* Head-to-head / Lineups / Timeline (tabs; auto-shown only where data exists) */}
+          <MatchTabs
+            analysis={analysisQuery.data}
+            lineup={lineupQuery.data}
+            events={eventQuery.data}
+            homeTeam={match?.home}
+            awayTeam={match?.away}
+            sportType={sportType}
+          />
 
           {/* Big ad — above the related matches */}
           <AdBanner slotId="watch-above-related" category={slug} size="rectangle" />
