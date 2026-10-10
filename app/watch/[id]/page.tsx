@@ -3,15 +3,16 @@ import { getMatchDetail } from '@/app/actions';
 import { WatchPageContent } from '@/components/WatchPageContent';
 
 interface PageProps {
-  params: { id: string };
-  searchParams: { sport?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ sport?: string }>;
 }
 
 /** Dynamic SEO metadata — OpenGraph title/description/thumbnail fetched
  *  server-side from the match detail. */
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
-  const id = params.id;
-  const sportType = Number(searchParams.sport) || 1;
+  const { id } = await params;
+  const { sport } = await searchParams;
+  const sportType = Number(sport) || 1;
   try {
     const res = await getMatchDetail({ matchId: id, sportType, language: 0, source: 'data' });
     if (!res.ok) throw new Error(res.error);
@@ -42,8 +43,9 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   }
 }
 
-export default function WatchPage({ params }: PageProps) {
-  return <WatchPageContent id={params.id} />;
+export default async function WatchPage({ params }: PageProps) {
+  const { id } = await params;
+  return <WatchPageContent id={id} />;
 }
 
 

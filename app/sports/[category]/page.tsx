@@ -4,7 +4,7 @@ import { sportBySlug, SPORTS } from '@/lib/sports';
 import { SportCategoryMatches } from '@/components/SportCategoryMatches';
 
 interface PageProps {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 }
 
 /** Pre-render each known sport slug as a static HTML shell (Vercel-friendly). */
@@ -13,8 +13,9 @@ export function generateStaticParams() {
 }
 
 /** Dynamic SEO metadata derived from the category slug. */
-export function generateMetadata({ params }: PageProps): Metadata {
-  const sport = sportBySlug(params.category);
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { category } = await params;
+  const sport = sportBySlug(category);
   if (!sport) {
     return {
       title: 'Category not found',
@@ -27,8 +28,9 @@ export function generateMetadata({ params }: PageProps): Metadata {
   };
 }
 
-export default function SportCategoryPage({ params }: PageProps) {
-  const sport = sportBySlug(params.category);
+export default async function SportCategoryPage({ params }: PageProps) {
+  const { category } = await params;
+  const sport = sportBySlug(category);
   if (!sport) notFound();
   return <SportCategoryMatches sportType={sport.value} category={sport.slug} label={sport.label} />;
 }
