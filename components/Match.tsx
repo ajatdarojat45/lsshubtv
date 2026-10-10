@@ -85,11 +85,13 @@ export function MatchRowSkeleton() {
   return (
     <div className="match-row skeleton-row">
       <div className="sk sk-line w30" />
-      <div className="sk sk-line w50" />
-      <div className="sk-row">
-        <div className="sk sk-circle" />
-        <div className="sk sk-line w70" />
-        <div className="sk sk-score" />
+      <div className="row-main">
+        <div className="sk sk-line w50" />
+        <div className="sk-row">
+          <div className="sk sk-circle" />
+          <div className="sk sk-line w70" />
+          <div className="sk sk-score" />
+        </div>
       </div>
       <div className="sk sk-line w40" />
     </div>
@@ -127,24 +129,26 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
         <span className="row-date-text">{formatMatchDate(match.matchDate)}</span>
       </span>
 
-      <span className="row-league">
-        <TeamLogo path={match.league?.logo} name={league} kind="league" />
-        <span className="row-league-name">{league}</span>
-      </span>
-
-      {scoring ? (
-        <span className="row-teams">
-          <span className="row-team">
-            <TeamSide teams={match.homeTeams?.length ? match.homeTeams : match.home ? [match.home] : []} sportType={match.sportType} />
-          </span>
-          <span className="row-score">{score(match.homeScore)} : {score(match.awayScore)}</span>
-          <span className="row-team away">
-            <TeamSide teams={match.awayTeams?.length ? match.awayTeams : match.away ? [match.away] : []} sportType={match.sportType} />
-          </span>
+      <span className="row-main">
+        <span className="row-league">
+          <TeamLogo path={match.league?.logo} name={league} kind="league" />
+          <span className="row-league-name">{league}</span>
         </span>
-      ) : (
-        <span className="row-event" title={eventName}>{eventName}</span>
-      )}
+
+        {scoring ? (
+          <span className="row-teams">
+            <span className="row-team">
+              <TeamSide teams={match.homeTeams?.length ? match.homeTeams : match.home ? [match.home] : []} sportType={match.sportType} />
+            </span>
+            <span className="row-score">{score(match.homeScore)} : {score(match.awayScore)}</span>
+            <span className="row-team away">
+              <TeamSide teams={match.awayTeams?.length ? match.awayTeams : match.away ? [match.away] : []} sportType={match.sportType} />
+            </span>
+          </span>
+        ) : (
+          <span className="row-event" title={eventName}>{eventName}</span>
+        )}
+      </span>
 
       <span className="row-status">
         {match.hot && <Flame className="hot" />}

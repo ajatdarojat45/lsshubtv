@@ -94,6 +94,8 @@ export interface MatchList {
 export interface Sport {
   value: number;
   label: string;
+  /** URL slug used in the dynamic route /sports/[category]. */
+  slug: string;
   icon: LucideIcon;
   color: string;
   /** Whether the sport uses a home/away score (defaults to true). */

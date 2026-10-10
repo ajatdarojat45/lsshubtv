@@ -21,22 +21,22 @@ import type { Sport } from './types';
 
 /** Single source of truth for sport categories (mapped to the app's sportType enum). */
 export const SPORTS: Sport[] = [
-  { value: 1, label: 'Football', icon: Trophy, color: '#22c55e' },
-  { value: 2, label: 'Basketball', icon: Target, color: '#f97316' },
-  { value: 3, label: 'Tennis', icon: CircleDot, color: '#a3e635' },
-  { value: 7, label: 'Motorsport', icon: Gauge, color: '#ef4444', scoring: false },
-  { value: 4, label: 'Baseball', icon: Circle, color: '#eab308' },
-  { value: 6, label: 'Cricket', icon: Activity, color: '#4ade80' },
-  { value: 8, label: 'Rugby', icon: Shield, color: '#d97706' },
-  { value: 9, label: 'American Football', icon: Flag, color: '#c084fc' },
-  { value: 10, label: 'Aussie Rules', icon: Zap, color: '#facc15' },
-  { value: 11, label: 'Ice Hockey', icon: Snowflake, color: '#38bdf8' },
-  { value: 12, label: 'Badminton', icon: Feather, color: '#2dd4bf' },
-  { value: 13, label: 'Volleyball', icon: CircleDashed, color: '#fb923c' },
-  { value: 14, label: 'Fighting', icon: Swords, color: '#f43f5e', scoring: false },
-  { value: 15, label: 'Cycling', icon: Bike, color: '#10b981', scoring: false },
-  { value: 16, label: 'Handball', icon: Dumbbell, color: '#818cf8' },
-  { value: 90, label: 'Others', icon: LayoutGrid, color: '#94a3b8' },
+  { value: 1, label: 'Football', slug: 'football', icon: Trophy, color: '#22c55e' },
+  { value: 2, label: 'Basketball', slug: 'basketball', icon: Target, color: '#f97316' },
+  { value: 3, label: 'Tennis', slug: 'tennis', icon: CircleDot, color: '#a3e635' },
+  { value: 7, label: 'Motorsport', slug: 'motorsport', icon: Gauge, color: '#ef4444', scoring: false },
+  { value: 4, label: 'Baseball', slug: 'baseball', icon: Circle, color: '#eab308' },
+  { value: 6, label: 'Cricket', slug: 'cricket', icon: Activity, color: '#4ade80' },
+  { value: 8, label: 'Rugby', slug: 'rugby', icon: Shield, color: '#d97706' },
+  { value: 9, label: 'American Football', slug: 'american-football', icon: Flag, color: '#c084fc' },
+  { value: 10, label: 'Aussie Rules', slug: 'aussie-rules', icon: Zap, color: '#facc15' },
+  { value: 11, label: 'Ice Hockey', slug: 'ice-hockey', icon: Snowflake, color: '#38bdf8' },
+  { value: 12, label: 'Badminton', slug: 'badminton', icon: Feather, color: '#2dd4bf' },
+  { value: 13, label: 'Volleyball', slug: 'volleyball', icon: CircleDashed, color: '#fb923c' },
+  { value: 14, label: 'Fighting', slug: 'fighting', icon: Swords, color: '#f43f5e', scoring: false },
+  { value: 15, label: 'Cycling', slug: 'cycling', icon: Bike, color: '#10b981', scoring: false },
+  { value: 16, label: 'Handball', slug: 'handball', icon: Dumbbell, color: '#818cf8' },
+  { value: 90, label: 'Others', slug: 'others', icon: LayoutGrid, color: '#94a3b8' },
 ];
 
 export const POPULAR_SPORTS: Sport[] = SPORTS.slice(0, 4);
@@ -58,6 +58,16 @@ export function sportColor(code?: number): string {
 
 export function sportIsScoring(code?: number): boolean {
   return sportByValue.get(code ?? -1)?.scoring !== false;
+}
+
+/** Resolve a URL slug (from /sports/[category]) back to a sport definition. */
+export function sportBySlug(slug: string): Sport | undefined {
+  return SPORTS.find((s) => s.slug === slug);
+}
+
+/** URL slug for a sport code; empty string when the code is unknown. */
+export function sportSlug(code?: number): string {
+  return sportByValue.get(code ?? -1)?.slug ?? '';
 }
 
 

@@ -8,6 +8,7 @@ import { QueryProvider } from '@/components/QueryProvider';
 import { RBProvider } from '@/components/RBProvider';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FooterCategories } from '@/components/FooterCategories';
+import { SportNav } from '@/components/SportNav';
 import { required } from '@/lib/env';
 
 const contactEmail = required(process.env.RB_CONTACT_EMAIL, 'RB_CONTACT_EMAIL');
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <span className="live-chip"><span className="dot" />LIVE</span>
                 </div>
               </header>
+              <SportNav />
               <main className="app-main">{children}</main>
               <footer className="app-footer">
                 <div className="footer-grid">
