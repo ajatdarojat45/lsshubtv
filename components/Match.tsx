@@ -46,6 +46,10 @@ const STATUS_LIVE = `${STATUS} bg-[var(--live-soft)] text-[#d93025] [[data-theme
 /** `.status-live .dot` (blinking live indicator) */
 const STATUS_DOT =
   'h-[7px] w-[7px] shrink-0 rounded-full bg-current animate-[blink_1.2s_infinite]';
+/** Inline `LIVE` tag shown next to the league name on live match cards —
+ *  reuses the live red so it matches the status badge + live phase text. */
+const LIVE_LABEL =
+  'inline-flex shrink-0 items-center gap-1 rounded bg-[#d93025] px-1.5 py-px text-[10px] font-extrabold uppercase tracking-[0.06em] text-white [[data-theme=dark]_&]:bg-[#f87171] [[data-theme=dark]_&]:text-[#1a1a1a]';
 
 /** `.match-row` base — single-column card; all info lives in the centred
  *  content (the side icon columns were removed as duplicates of the centre).
@@ -234,6 +238,12 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
               {match.hot && <Flame className="h-3.5 w-3.5 shrink-0 text-[#d93025] [[data-theme=dark]_&]:text-[#f87171]" />}
               <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
               <span className="min-w-0 max-w-[260px] truncate">{sportName}{' · '}{league}</span>
+              {live && (
+                <span className={LIVE_LABEL}>
+                  <span className="h-1 w-1 rounded-full bg-current animate-[blink_1.2s_infinite]" />
+                  Live
+                </span>
+              )}
             </span>
             <span className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5">
               <span className="flex min-w-0 justify-end">
@@ -263,6 +273,12 @@ export function MatchRow({ match, onClick }: MatchRowProps) {
             <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted">
               <TeamLogo path={match.league?.logo} name={league} kind="league" size="league" />
               <span className="truncate">{sportName}{' · '}{league}</span>
+              {live && (
+                <span className={LIVE_LABEL}>
+                  <span className="h-1 w-1 rounded-full bg-current animate-[blink_1.2s_infinite]" />
+                  Live
+                </span>
+              )}
             </span>
             <span className="truncate text-[15px] font-bold" title={eventName}>{eventName}</span>
             {live ? (
